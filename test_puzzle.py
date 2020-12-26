@@ -131,3 +131,31 @@ class TestOrientation:
         flipped = flipped.reorient(flip=True, turn=Turn.TURN_90)
         assert str(flipped) == "Red-♥♦♢♡"
         assert flipped == orient
+
+
+class TestPieces:
+    def test_default_init(self):
+        """Default is standard order"""
+        piece = Piece(Shape.HEART, Shape.SPADE, Shape.SPADE, Shape.CLUB)
+        assert str(piece) == "Red-♥♠♤♧"
+        assert repr(piece) == (
+            "Piece(Shape.HEART, Shape.SPADE, Shape.SPADE, Shape.CLUB)"
+        )
+
+    def test_full_init(self):
+        """A non-standard order is converted to standard."""
+        piece = Piece(
+            Shape.SPADE,
+            Shape.DIAMOND,
+            Shape.HEART,
+            Shape.DIAMOND,
+            End.TAB,
+            End.BLANK,
+            End.BLANK,
+            End.TAB,
+            Side.BLACK,
+        )
+        assert str(piece) == "Red-♠♦♡♢"
+        assert repr(piece) == (
+            "Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)"
+        )

@@ -70,6 +70,11 @@ class Orientation:
             parts.extend([shape, end])
         return f"{self.__class__.__name__}({', '.join(str(p) for p in parts)})"
 
+    def __str__(self):
+        parts = [self.side.value, "-"]
+        parts.extend([self.pip[edge] for edge in self.order])
+        return "".join(parts)
+
     def is_valid(self) -> bool:
         """Determine if the orientation is from One Tough Puzzle."""
         return True
@@ -122,11 +127,6 @@ class Orientation:
     def __ne__(self, other):
         return not self.__eq__(other)
 
-    def __str__(self):
-        parts = [self.side.value, "-"]
-        parts.extend([self.pip[edge] for edge in self.order])
-        return "".join(parts)
-
 
 class Piece:
     def __init__(
@@ -158,6 +158,13 @@ class Piece:
             west_shape,
             west_orientation,
         ).to_standard()
+
+    def __repr__(self):
+        parts = [shape for shape, end in self.orientation.order]
+        return f"{self.__class__.__name__}({', '.join(str(p) for p in parts)})"
+
+    def __str__(self):
+        return str(self.orientation)
 
 
 if __name__ == "__main__":
