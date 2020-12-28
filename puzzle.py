@@ -360,4 +360,21 @@ class OrientedPiece(Orientation):
 
 
 if __name__ == "__main__":
-    print("Hello, world!")
+    pieces = sorted(
+        [
+            Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND),
+            Piece(Shape.CLUB, Shape.HEART, Shape.SPADE, Shape.HEART),
+            Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART),
+            Piece(Shape.DIAMOND, Shape.CLUB, Shape.CLUB, Shape.DIAMOND),
+            Piece(Shape.SPADE, Shape.SPADE, Shape.HEART, Shape.CLUB),
+            Piece(Shape.SPADE, Shape.DIAMOND, Shape.SPADE, Shape.HEART),
+            Piece(Shape.HEART, Shape.DIAMOND, Shape.CLUB, Shape.CLUB),
+            Piece(Shape.CLUB, Shape.HEART, Shape.DIAMOND, Shape.CLUB),
+            Piece(Shape.HEART, Shape.SPADE, Shape.SPADE, Shape.CLUB),
+        ]
+    )
+    print("Pieces:")
+    for piece in pieces:
+        print(f"  {piece}")
+    possibilities = 8 ** len(pieces)
+    print(f"{possibilities:,} possible combinations")
