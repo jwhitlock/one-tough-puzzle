@@ -178,6 +178,9 @@ class Orientation:
     def __lt__(self, other):
         return self._attributes < other._attributes
 
+    def __hash__(self):
+        return hash(self._attributes)
+
     def is_valid(self) -> bool:
         """Determine if the orientation could be from One Tough Puzzle."""
         return self.ends in (
@@ -230,7 +233,7 @@ class Orientation:
         )
 
 
-class Piece:
+class Piece(Orientation):
     """A puzzle piece."""
 
     def __init__(
@@ -239,10 +242,10 @@ class Piece:
         east_shape: Shape,
         south_shape: Shape,
         west_shape: Shape,
-        north_orientation: End = End.TAB,
-        east_orientation: End = End.TAB,
-        south_orientation: End = End.BLANK,
-        west_orientation: End = End.BLANK,
+        north_end: End = End.TAB,
+        east_end: End = End.TAB,
+        south_end: End = End.BLANK,
+        west_end: End = End.BLANK,
         side: Side = Side.RED,
     ):
         """
@@ -251,59 +254,78 @@ class Piece:
         Standard position is Red side up, tabs at north and east, and blanks at south
         and west.
         """
-        self.orientation = Orientation(
+        std = Orientation(
             side,
             north_shape,
-            north_orientation,
+            north_end,
             east_shape,
-            east_orientation,
+            east_end,
             south_shape,
-            south_orientation,
+            south_end,
             west_shape,
-            west_orientation,
+            west_end,
         ).to_standard()
+        super().__init__(
+            std.side,
+            std.north_shape,
+            std.north_end,
+            std.east_shape,
+            std.east_end,
+            std.south_shape,
+            std.south_end,
+            std.west_shape,
+            std.west_end,
+        )
+
+    def __eq__(self, other):
+        """Pieces with same attributes are not equal."""
+        if not isinstance(other, Piece):
+            return NotImplemented
+        return self is other
+
+    def __ne__(self, other):
+        if not isinstance(other, Orientation):
+            return NotImplemented
+        return self is not other
+
+    def __hash__(self):
+        return hash((self.side, *self.shapes))
 
     def __repr__(self):
-        parts = [shape for shape, end in self.orientation.edges]
-        return f"{self.__class__.__name__}({', '.join(str(p) for p in parts)})"
-
-    def __str__(self):
-        return str(self.orientation)
-
-    side = property(lambda self: self.orientation.side)
-    north = property(lambda self: self.orientation.north)
-    east = property(lambda self: self.orientation.east)
-    south = property(lambda self: self.orientation.south)
-    west = property(lambda self: self.orientation.west)
-    north_shape = property(lambda self: self.orientation.north_shape)
-    east_shape = property(lambda self: self.orientation.east_shape)
-    south_shape = property(lambda self: self.orientation.south_shape)
-    west_shape = property(lambda self: self.orientation.west_shape)
-    north_end = property(lambda self: self.orientation.north_end)
-    east_end = property(lambda self: self.orientation.east_end)
-    south_end = property(lambda self: self.orientation.south_end)
-    west_end = property(lambda self: self.orientation.west_end)
+        """Use defaults for repr"""
+        return f"{self.__class__.__name__}({', '.join(str(s) for s in self.shapes)})"
 
     def fits_right(self, other: "Piece"):
         """Return pairs where this fits with the other piece."""
         combos = product((False, True), Turn, (False, True), Turn)
-        fits = []
+        fits = set()
         for flip, turn, other_flip, other_turn in combos:
             orient = OrientedPiece(self, flip, turn)
             other_orient = OrientedPiece(other, other_flip, other_turn)
             if orient.fits_right(other_orient):
-                fits.append((orient, other_orient))
+                fits.add((orient, other_orient))
         return fits
 
 
-class OrientedPiece:
+class OrientedPiece(Orientation):
     """A puzzle piece in a particular orientation."""
 
     def __init__(self, piece: Piece, flip: bool = False, turn: Turn = Turn.NO_TURN):
         self.piece = piece
         self.flip = flip
         self.turn = turn
-        self.orientation = piece.orientation.reorient(flip=flip, turn=turn)
+        orientation = piece.reorient(flip=flip, turn=turn)
+        super().__init__(
+            orientation.side,
+            orientation.north_shape,
+            orientation.north_end,
+            orientation.east_shape,
+            orientation.east_end,
+            orientation.south_shape,
+            orientation.south_end,
+            orientation.west_shape,
+            orientation.west_end,
+        )
 
     def __repr__(self):
         parts = [repr(self.piece)]
@@ -314,29 +336,22 @@ class OrientedPiece:
 
         return f"OrientedPiece({', '.join(p for p in parts)})"
 
-    def __str__(self):
-        return str(self.orientation)
-
     def __eq__(self, other):
         return (
-            (self.piece == other.piece)
+            (self.piece is other.piece)
             and (self.flip == other.flip)
             and (self.turn == other.turn)
         )
 
-    side = property(lambda self: self.orientation.side)
-    north = property(lambda self: self.orientation.north)
-    east = property(lambda self: self.orientation.east)
-    south = property(lambda self: self.orientation.south)
-    west = property(lambda self: self.orientation.west)
-    north_shape = property(lambda self: self.orientation.north_shape)
-    east_shape = property(lambda self: self.orientation.east_shape)
-    south_shape = property(lambda self: self.orientation.south_shape)
-    west_shape = property(lambda self: self.orientation.west_shape)
-    north_end = property(lambda self: self.orientation.north_end)
-    east_end = property(lambda self: self.orientation.east_end)
-    south_end = property(lambda self: self.orientation.south_end)
-    west_end = property(lambda self: self.orientation.west_end)
+    def __ne__(self, other):
+        return (
+            (self.piece is not other.piece)
+            or (self.flip != other.flip)
+            or (self.turn != other.turn)
+        )
+
+    def __hash__(self):
+        return hash((self.piece, self.flip, self.turn))
 
     def fits_right(self, other):
         return (self.east_shape == other.west_shape) and (

@@ -274,7 +274,7 @@ class TestPieces:
         )
         assert str(piece1) == "Red-♠♦♤♢"
         assert str(piece2) == "Red-♣♥♧♡"
-        assert piece1.fits_right(piece2) == []
+        assert piece1.fits_right(piece2) == set()
 
     def test_fit_one_side(self):
         """A piece with one possible matching side fits 4 ways."""
@@ -292,7 +292,7 @@ class TestPieces:
         )
         assert str(piece1) == "Red-♦♥♡♡"
         assert str(piece2) == "Red-♣♣♢♧"
-        assert piece1.fits_right(piece2) == [
+        expected = [
             (
                 OrientedPiece(piece1, turn=Turn.TURN_90),
                 OrientedPiece(piece2, turn=Turn.TURN_90),
@@ -310,6 +310,8 @@ class TestPieces:
                 OrientedPiece(piece2, flip=True, turn=Turn.TURN_90),
             ),
         ]
+        assert sorted(expected) == expected
+        assert piece1.fits_right(piece2) == set(expected)
 
 
 class TestOrientedPiece:
