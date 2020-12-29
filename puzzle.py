@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Solve One Tough Puzzle™"""
 
 from enum import Enum, IntEnum
@@ -295,7 +296,7 @@ class Piece(Orientation):
         """Use defaults for repr"""
         return f"{self.__class__.__name__}({', '.join(str(s) for s in self.shapes)})"
 
-    def fits_right(self, other: "Piece"):
+    def row_pairs_with(self, other: "Piece"):
         """Return pairs where this fits with the other piece."""
         combos = product((False, True), Turn, (False, True), Turn)
         fits = set()
@@ -303,7 +304,7 @@ class Piece(Orientation):
             orient = OrientedPiece(self, flip, turn)
             other_orient = OrientedPiece(other, other_flip, other_turn)
             if orient.fits_right(other_orient):
-                fits.add((orient, other_orient))
+                fits.add(RowPair(orient, other_orient))
         return fits
 
 
@@ -337,6 +338,8 @@ class OrientedPiece(Orientation):
         return f"OrientedPiece({', '.join(p for p in parts)})"
 
     def __eq__(self, other):
+        if not isinstance(other, OrientedPiece):
+            return NotImplemented
         return (
             (self.piece is other.piece)
             and (self.flip == other.flip)
@@ -344,6 +347,8 @@ class OrientedPiece(Orientation):
         )
 
     def __ne__(self, other):
+        if not isinstance(other, OrientedPiece):
+            return NotImplemented
         return (
             (self.piece is not other.piece)
             or (self.flip != other.flip)
@@ -354,9 +359,53 @@ class OrientedPiece(Orientation):
         return hash((self.piece, self.flip, self.turn))
 
     def fits_right(self, other):
-        return (self.east_shape == other.west_shape) and (
-            self.east_end != other.west_end
+        return (
+            (self.piece is not other.piece)
+            and (self.east_shape == other.west_shape)
+            and (self.east_end != other.west_end)
         )
+
+
+class RowPair:
+    """A pair of matching pieces"""
+
+    def __init__(self, left, right):
+        assert left.fits_right(right)
+        self._pair = (left, right)
+
+    left = property(lambda self: self._pair[0])
+    right = property(lambda self: self._pair[1])
+
+    def __str__(self):
+        return f"{self.left} → {self.right}"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.left!r}, {self.right!r})"
+
+    def __eq__(self, other):
+        if not isinstance(other, RowPair):
+            return NotImplemented
+        return self._pair == other._pair
+
+    def __ne__(self, other):
+        if not isinstance(other, RowPair):
+            return NotImplemented
+        return self._pair != other._pair
+
+    def __ge__(self, other: "RowPair"):
+        return self._pair >= other._pair
+
+    def __gt__(self, other: "RowPair"):
+        return self._pair > other._pair
+
+    def __le__(self, other: "RowPair"):
+        return self._pair <= other._pair
+
+    def __lt__(self, other: "RowPair"):
+        return self._pair < other._pair
+
+    def __hash__(self):
+        return hash(self._pair)
 
 
 if __name__ == "__main__":
@@ -378,3 +427,12 @@ if __name__ == "__main__":
         print(f"  {piece}")
     possibilities = 8 ** len(pieces)
     print(f"{possibilities:,} possible combinations")
+
+    print("Finding pairs...")
+    row_pairs = set()
+    for piece in pieces:
+        for other in pieces:
+            row_pairs |= piece.row_pairs_with(other)
+    for row_pair in sorted(row_pairs):
+        print(f"  {row_pair}")
+    print(f"{len(row_pairs):,} row pairs")

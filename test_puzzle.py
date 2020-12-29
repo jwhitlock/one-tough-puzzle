@@ -2,7 +2,16 @@
 
 import pytest
 
-from puzzle import Orientation, Shape, End, Side, Turn, Piece, OrientedPiece
+from puzzle import (
+    End,
+    Orientation,
+    OrientedPiece,
+    Piece,
+    RowPair,
+    Shape,
+    Side,
+    Turn,
+)
 
 
 class TestShape:
@@ -274,7 +283,7 @@ class TestPieces:
         )
         assert str(piece1) == "Red-♠♦♤♢"
         assert str(piece2) == "Red-♣♥♧♡"
-        assert piece1.fits_right(piece2) == set()
+        assert piece1.row_pairs_with(piece2) == set()
 
     def test_fit_one_side(self):
         """A piece with one possible matching side fits 4 ways."""
@@ -293,25 +302,35 @@ class TestPieces:
         assert str(piece1) == "Red-♦♥♡♡"
         assert str(piece2) == "Red-♣♣♢♧"
         expected = [
-            (
+            RowPair(
                 OrientedPiece(piece1, turn=Turn.TURN_90),
                 OrientedPiece(piece2, turn=Turn.TURN_90),
             ),
-            (
+            RowPair(
                 OrientedPiece(piece1, turn=Turn.TURN_90),
                 OrientedPiece(piece2, flip=True, turn=Turn.TURN_90),
             ),
-            (
+            RowPair(
                 OrientedPiece(piece1, flip=True, turn=Turn.TURN_90),
                 OrientedPiece(piece2, turn=Turn.TURN_90),
             ),
-            (
+            RowPair(
                 OrientedPiece(piece1, flip=True, turn=Turn.TURN_90),
                 OrientedPiece(piece2, flip=True, turn=Turn.TURN_90),
             ),
         ]
         assert sorted(expected) == expected
-        assert piece1.fits_right(piece2) == set(expected)
+        assert piece1.row_pairs_with(piece2) == set(expected)
+
+    def test_no_fit_self(self):
+        """A piece doesn't fit itself."""
+        piece = Piece(
+            Shape.HEART,
+            Shape.HEART,
+            Shape.HEART,
+            Shape.HEART,
+        )
+        assert piece.row_pairs_with(piece) == set()
 
 
 class TestOrientedPiece:
@@ -416,3 +435,20 @@ class TestOrientedPiece:
         op1 = OrientedPiece(piece1, flip1, turn1)
         op2 = OrientedPiece(piece2, flip2, turn2)
         assert op1.fits_right(op2) is fits
+
+
+class TestRowPair:
+    def test_init(self):
+        piece1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
+        piece2 = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
+        op1 = OrientedPiece(piece1)
+        op2 = OrientedPiece(piece2)
+        rp = RowPair(op1, op2)
+
+        assert str(rp) == "Red-♥♦♢♡ → Red-♠♦♡♢"
+        assert repr(rp) == (
+            "RowPair(OrientedPiece(Piece("
+            "Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)),"
+            " OrientedPiece(Piece("
+            "Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)))"
+        )
