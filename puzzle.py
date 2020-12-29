@@ -4,36 +4,34 @@
 from enum import Enum, IntEnum
 from functools import total_ordering
 from itertools import product
-from typing import ClassVar, Dict, Tuple
+from typing import ClassVar, Dict, Tuple, Set
 
 
-class OrderedLabeledEnum(bytes, Enum):
+class OrderedLabeledEnum(Enum):
     """An enumeration supporting ordering and a label"""
 
-    def __new__(cls, value, label):
-        obj = bytes.__new__(cls, [value])
-        obj._value_ = value
-        obj.label = label
-        return obj
+    def __init__(self, order: int, label: str):
+        self.order = order
+        self.label = label
 
-    def __ge__(self, other):
+    def __ge__(self, other: "OrderedLabeledEnum") -> bool:
         if self.__class__ is other.__class__:
-            return self.value >= other.value
+            return self.order >= other.order
         return NotImplemented
 
-    def __gt__(self, other):
+    def __gt__(self, other: "OrderedLabeledEnum") -> bool:
         if self.__class__ is other.__class__:
-            return self.value > other.value
+            return self.order > other.order
         return NotImplemented
 
-    def __le__(self, other):
+    def __le__(self, other: "OrderedLabeledEnum") -> bool:
         if self.__class__ is other.__class__:
-            return self.value <= other.value
+            return self.order <= other.order
         return NotImplemented
 
-    def __lt__(self, other):
+    def __lt__(self, other: "OrderedLabeledEnum") -> bool:
         if self.__class__ is other.__class__:
-            return self.value < other.value
+            return self.order < other.order
         return NotImplemented
 
 
@@ -97,29 +95,40 @@ class Orientation:
         )
 
     @property
-    def side(self):
+    def side(self) -> Side:
         return self._attributes[0]
 
     @property
-    def ends(self):
+    def ends(self) -> Tuple[End, End, End, End]:
         return self._attributes[1]
 
     @property
-    def shapes(self):
+    def shapes(self) -> Tuple[Shape, Shape, Shape, Shape]:
         return self._attributes[2]
 
     @property
-    def edges(self):
-        return tuple(zip(self.shapes, self.ends))
+    def edges(
+        self,
+    ) -> Tuple[
+        Tuple[Shape, End], Tuple[Shape, End], Tuple[Shape, End], Tuple[Shape, End]
+    ]:
+        shapes = self.shapes
+        ends = self.ends
+        return (
+            (shapes[0], ends[0]),
+            (shapes[1], ends[1]),
+            (shapes[2], ends[2]),
+            (shapes[3], ends[3]),
+        )
 
-    def end(self, edge: Edge):
-        return self._attributes[1][edge.value]
+    def end(self, edge: Edge) -> End:
+        return self._attributes[1][edge.order]
 
-    def shape(self, edge: Edge):
-        return self._attributes[2][edge.value]
+    def shape(self, edge: Edge) -> Shape:
+        return self._attributes[2][edge.order]
 
-    def edge(self, edge: Edge):
-        return (self._attributes[2][edge.value], self._attributes[1][edge.value])
+    def edge(self, edge: Edge) -> Tuple[Shape, End]:
+        return (self._attributes[2][edge.order], self._attributes[1][edge.order])
 
     north = property(lambda self: self.edge(Edge.NORTH))
     east = property(lambda self: self.edge(Edge.EAST))
@@ -134,12 +143,12 @@ class Orientation:
     south_end = property(lambda self: self.end(Edge.SOUTH))
     west_end = property(lambda self: self.end(Edge.WEST))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Print a eval() representation."""
         parts = [str(self.side)]
         for shape, end in zip(self.shapes, self.ends):
-            parts.extend([shape, end])
-        return f"{self.__class__.__name__}({', '.join(str(p) for p in parts)})"
+            parts.extend([str(shape), str(end)])
+        return f"{self.__class__.__name__}({', '.join(parts)})"
 
     _pip: ClassVar[Dict[Tuple[Shape, End], str]] = {
         (Shape.HEART, End.TAB): "♥",
@@ -152,34 +161,34 @@ class Orientation:
         (Shape.SPADE, End.BLANK): "♤",
     }
 
-    def __str__(self):
+    def __str__(self) -> str:
         parts = [self.side.label, "-"]
         parts.extend([self._pip[edge] for edge in self.edges])
         return "".join(parts)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Orientation):
             return NotImplemented
         return self._attributes == other._attributes
 
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         if not isinstance(other, Orientation):
             return NotImplemented
         return self._attributes != other._attributes
 
-    def __ge__(self, other: "Orientation"):
+    def __ge__(self, other: "Orientation") -> bool:
         return self._attributes >= other._attributes
 
-    def __gt__(self, other: "Orientation"):
+    def __gt__(self, other: "Orientation") -> bool:
         return self._attributes > other._attributes
 
-    def __le__(self, other: "Orientation"):
+    def __le__(self, other: "Orientation") -> bool:
         return self._attributes <= other._attributes
 
-    def __lt__(self, other):
+    def __lt__(self, other: "Orientation") -> bool:
         return self._attributes < other._attributes
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self._attributes)
 
     def is_valid(self) -> bool:
@@ -193,11 +202,9 @@ class Orientation:
 
     def is_standard(self) -> bool:
         """Determine if the orientation is standard."""
-        return self.side == Side.RED and self.ends == (
-            End.TAB,
-            End.TAB,
-            End.BLANK,
-            End.BLANK,
+        return bool(
+            self.side == Side.RED
+            and self.ends == (End.TAB, End.TAB, End.BLANK, End.BLANK)
         )
 
     def to_standard(self) -> "Orientation":
@@ -278,25 +285,25 @@ class Piece(Orientation):
             std.west_end,
         )
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         """Pieces with same attributes are not equal."""
         if not isinstance(other, Piece):
             return NotImplemented
         return self is other
 
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         if not isinstance(other, Orientation):
             return NotImplemented
         return self is not other
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.side, *self.shapes))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Use defaults for repr"""
         return f"{self.__class__.__name__}({', '.join(str(s) for s in self.shapes)})"
 
-    def row_pairs_with(self, other: "Piece"):
+    def row_pairs_with(self, other: "Piece") -> Set["RowPair"]:
         """Return pairs where this fits with the other piece."""
         combos = product((False, True), Turn, (False, True), Turn)
         fits = set()
@@ -328,7 +335,7 @@ class OrientedPiece(Orientation):
             orientation.west_end,
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         parts = [repr(self.piece)]
         if self.flip:
             parts.append("flip=True")
@@ -337,7 +344,7 @@ class OrientedPiece(Orientation):
 
         return f"OrientedPiece({', '.join(p for p in parts)})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, OrientedPiece):
             return NotImplemented
         return (
@@ -346,7 +353,7 @@ class OrientedPiece(Orientation):
             and (self.turn == other.turn)
         )
 
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         if not isinstance(other, OrientedPiece):
             return NotImplemented
         return (
@@ -355,10 +362,10 @@ class OrientedPiece(Orientation):
             or (self.turn != other.turn)
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.piece, self.flip, self.turn))
 
-    def fits_right(self, other):
+    def fits_right(self, other: "OrientedPiece") -> bool:
         return (
             (self.piece is not other.piece)
             and (self.east_shape == other.west_shape)
@@ -369,42 +376,42 @@ class OrientedPiece(Orientation):
 class RowPair:
     """A pair of matching pieces"""
 
-    def __init__(self, left, right):
+    def __init__(self, left: OrientedPiece, right: OrientedPiece):
         assert left.fits_right(right)
         self._pair = (left, right)
 
     left = property(lambda self: self._pair[0])
     right = property(lambda self: self._pair[1])
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.left} → {self.right}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.left!r}, {self.right!r})"
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, RowPair):
             return NotImplemented
         return self._pair == other._pair
 
-    def __ne__(self, other):
+    def __ne__(self, other: object) -> bool:
         if not isinstance(other, RowPair):
             return NotImplemented
         return self._pair != other._pair
 
-    def __ge__(self, other: "RowPair"):
+    def __ge__(self, other: "RowPair") -> bool:
         return self._pair >= other._pair
 
-    def __gt__(self, other: "RowPair"):
+    def __gt__(self, other: "RowPair") -> bool:
         return self._pair > other._pair
 
-    def __le__(self, other: "RowPair"):
+    def __le__(self, other: "RowPair") -> bool:
         return self._pair <= other._pair
 
-    def __lt__(self, other: "RowPair"):
+    def __lt__(self, other: "RowPair") -> bool:
         return self._pair < other._pair
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self._pair)
 
 

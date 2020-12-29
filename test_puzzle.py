@@ -15,33 +15,33 @@ from puzzle import (
 
 
 class TestShape:
-    def test_order(self):
+    def test_order(self) -> None:
         assert Shape.CLUB < Shape.DIAMOND < Shape.HEART < Shape.SPADE
 
-    def test_str(self):
+    def test_str(self) -> None:
         assert str(Shape.CLUB) == "Shape.CLUB"
 
-    def test_label(self):
+    def test_label(self) -> None:
         assert Shape.DIAMOND.label == "Diamond"
 
 
 class TestEnd:
-    def test_order(self):
+    def test_order(self) -> None:
         assert End.TAB < End.BLANK
 
 
 class TestSide:
-    def test_order(self):
+    def test_order(self) -> None:
         assert Side.RED < Side.BLACK
 
 
 class TestTurn:
-    def test_order(self):
+    def test_order(self) -> None:
         assert Turn.NO_TURN < Turn.TURN_90 < Turn.TURN_180 < Turn.TURN_270
 
 
 class TestOrientation:
-    def test_standard_orientation(self):
+    def test_standard_orientation(self) -> None:
         """Test an Orientation initialized to standard orientation"""
         orient = Orientation(
             Side.RED,
@@ -81,7 +81,7 @@ class TestOrientation:
         assert orient.south_end == End.BLANK
         assert orient.west_end == End.BLANK
 
-    def test_rotated_90(self):
+    def test_rotated_90(self) -> None:
         """Test an Orientation rotated 90 from standard orientation"""
         orient = Orientation(
             Side.RED,
@@ -102,7 +102,7 @@ class TestOrientation:
         assert standard == rotated
         assert str(orient) == "Red-♡♥♦♢"
 
-    def test_flipped(self):
+    def test_flipped(self) -> None:
         """Test an Orientation flipped from standard orientation"""
         orient = Orientation(
             Side.BLACK,
@@ -123,7 +123,7 @@ class TestOrientation:
         assert standard == rotated
         assert str(orient) == "Black-♥♡♢♦"
 
-    def test_reorientation(self):
+    def test_reorientation(self) -> None:
         """Test reorientation."""
         orient = Orientation(
             Side.RED,
@@ -183,7 +183,7 @@ class TestOrientation:
         assert str(flipped) == "Red-♥♦♢♡"
         assert flipped == orient
 
-    def test_invalid(self):
+    def test_invalid(self) -> None:
         invalid = Orientation(
             Side.RED,
             Shape.CLUB,
@@ -197,7 +197,7 @@ class TestOrientation:
         )
         assert not invalid.is_valid()
 
-    def test_order(self):
+    def test_order(self) -> None:
         or_least = Orientation(
             Side.RED,
             Shape.CLUB,
@@ -225,7 +225,7 @@ class TestOrientation:
 
 
 class TestPieces:
-    def test_default_init(self):
+    def test_default_init(self) -> None:
         """Default is the standard orientation"""
         piece = Piece(Shape.HEART, Shape.SPADE, Shape.SPADE, Shape.CLUB)
         assert str(piece) == "Red-♥♠♤♧"
@@ -249,7 +249,7 @@ class TestPieces:
         assert piece.south_end == End.BLANK
         assert piece.west_end == End.BLANK
 
-    def test_full_init(self):
+    def test_full_init(self) -> None:
         """A non-standard orientation is converted to standard."""
         piece = Piece(
             Shape.SPADE,
@@ -267,7 +267,7 @@ class TestPieces:
             "Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)"
         )
 
-    def test_fits_none(self):
+    def test_fits_none(self) -> None:
         """A piece with no matches has no fits."""
         piece1 = Piece(
             Shape.SPADE,
@@ -285,7 +285,7 @@ class TestPieces:
         assert str(piece2) == "Red-♣♥♧♡"
         assert piece1.row_pairs_with(piece2) == set()
 
-    def test_fit_one_side(self):
+    def test_fit_one_side(self) -> None:
         """A piece with one possible matching side fits 4 ways."""
         piece1 = Piece(
             Shape.DIAMOND,
@@ -322,7 +322,7 @@ class TestPieces:
         assert sorted(expected) == expected
         assert piece1.row_pairs_with(piece2) == set(expected)
 
-    def test_no_fit_self(self):
+    def test_no_fit_self(self) -> None:
         """A piece doesn't fit itself."""
         piece = Piece(
             Shape.HEART,
@@ -334,7 +334,7 @@ class TestPieces:
 
 
 class TestOrientedPiece:
-    def test_default_init(self):
+    def test_default_init(self) -> None:
         """Default is the standard orientation."""
         piece = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
         op = OrientedPiece(piece)
@@ -359,7 +359,7 @@ class TestOrientedPiece:
         assert piece.south_end == End.BLANK
         assert piece.west_end == End.BLANK
 
-    def test_flipped_init(self):
+    def test_flipped_init(self) -> None:
         """A piece can be flipped at init."""
         piece = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
         op = OrientedPiece(piece, flip=True)
@@ -370,7 +370,7 @@ class TestOrientedPiece:
             " flip=True)"
         )
 
-    def test_turned_init(self):
+    def test_turned_init(self) -> None:
         """A piece can be turned at init."""
         piece = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
         op = OrientedPiece(piece, turn=Turn.TURN_90)
@@ -381,7 +381,7 @@ class TestOrientedPiece:
             " turn=Turn.TURN_90)"
         )
 
-    def test_full_init(self):
+    def test_full_init(self) -> None:
         """A piece can be flipped and turned at init."""
         piece = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
         op = OrientedPiece(piece, flip=True, turn=Turn.TURN_90)
@@ -392,7 +392,7 @@ class TestOrientedPiece:
             " flip=True, turn=Turn.TURN_90)"
         )
 
-    def test_equality(self):
+    def test_equality(self) -> None:
         """An OrientedPiece is equal when the same piece and orientation."""
         piece1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.DIAMOND)
         clone1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.DIAMOND)
@@ -428,7 +428,9 @@ class TestOrientedPiece:
             (False, Turn.TURN_90, False, Turn.TURN_90, True),
         ],
     )
-    def test_fits_right(self, flip1, turn1, flip2, turn2, fits):
+    def test_fits_right(
+        self, flip1: bool, turn1: Turn, flip2: bool, turn2: Turn, fits: bool
+    ) -> None:
         """fits_right() returns True when oriented to fit."""
         piece1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.DIAMOND)
         piece2 = Piece(Shape.CLUB, Shape.CLUB, Shape.HEART, Shape.SPADE)
@@ -438,7 +440,7 @@ class TestOrientedPiece:
 
 
 class TestRowPair:
-    def test_init(self):
+    def test_init(self) -> None:
         piece1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
         piece2 = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
         op1 = OrientedPiece(piece1)
