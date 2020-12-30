@@ -4,7 +4,8 @@
 from enum import Enum, IntEnum
 from functools import total_ordering
 from itertools import product
-from typing import ClassVar, Dict, Tuple, Set, Union, Type, cast
+from typing import ClassVar, Dict, Tuple, Set, Union, Type, Sequence, cast
+from math import floor
 
 
 class OrderedLabeledEnum(Enum):
@@ -373,6 +374,19 @@ class OrientedPiece(Orientation):
             and (self.east_end != other.west_end)
         )
 
+    def fits_left(self, other: "OrientedPiece") -> bool:
+        return other.fits_right(self)
+
+    def fits_below(self, other: "OrientedPiece") -> bool:
+        return (
+            (self.piece is not other.piece)
+            and (self.north_shape == other.south_shape)
+            and (self.north_end != other.south_end)
+        )
+
+    def fits_above(self, other: "OrientedPiece") -> bool:
+        return other.fits_below(self)
+
 
 class RowPair:
     """A pair of matching pieces"""
@@ -498,9 +512,37 @@ class Puzzle:
     height = property(lambda self: self._puzzle[1])
     pieces = property(lambda self: self._puzzle[2:])
 
-    def get(self, row: int, col: int) -> Union[OrientedPiece, Type[EmptySpot]]:
-        if row < 0 or col < 0 or row >= self.width or col >= self.height:
-            raise IndexError
+    def __repr__(self) -> str:
+        return "Puzzle()"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Puzzle):
+            return NotImplemented
+        return self._puzzle == other._puzzle
+
+    def __ne__(self, other: object) -> bool:
+        if not isinstance(other, Puzzle):
+            return NotImplemented
+        return self._puzzle != other._puzzle
+
+    def __ge__(self, other: "Puzzle") -> bool:
+        return self._puzzle >= other._puzzle
+
+    def __gt__(self, other: "Puzzle") -> bool:
+        return self._puzzle > other._puzzle
+
+    def __le__(self, other: "Puzzle") -> bool:
+        return self._puzzle <= other._puzzle
+
+    def __lt__(self, other: "Puzzle") -> bool:
+        return self._puzzle < other._puzzle
+
+    def __hash__(self) -> int:
+        return hash(self._puzzle)
+
+    def get(self, col: int, row: int) -> Union[OrientedPiece, Type[EmptySpot]]:
+        if col < 0 or row < 0 or col >= self.width or row >= self.height:
+            return EmptySpot
         return cast(
             Union[OrientedPiece, Type[EmptySpot]], self.pieces[self.width * row + col]
         )
@@ -519,12 +561,12 @@ class Puzzle:
             # Check if surrounding spots are empty or pieces
             above: Union[OrientedPiece, Type[EmptySpot]] = EmptySpot
             if row != 0:
-                above = self.get(row - 1, col)
+                above = self.get(col, row - 1)
             above_empty = above is EmptySpot
 
             left: Union[OrientedPiece, Type[EmptySpot]] = EmptySpot
             if col != 0:
-                left = self.get(row, col - 1)
+                left = self.get(col - 1, row)
             left_empty = left is EmptySpot
 
             is_last_row = row == (self.width - 1)
@@ -623,22 +665,110 @@ class Puzzle:
 
         return "\n".join(out)
 
-        col, row = 0, 0
-        # Create width x height grid of
-        width = self.width
-        grid = tuple(
-            self.pieces[x : x + width] for x in range(0, width * self.height, width)
-        )
+    def fit_at(self, piece: Piece, at_column: int, at_row: int) -> Set["Puzzle"]:
+        """Return puzzles where this piece fits at the given spot."""
 
-        out = ""
-        for row_num, row in enumerate(grid):
-            for col_num, col in enumerate(row):
-                out += f"[{row_num},{col_num}]"
-            out += "\n"
-        return out[:-1]
+        for oriented_piece in self.pieces:
+            if oriented_piece is not EmptySpot and oriented_piece.piece is piece:
+                # Can't add piece twice
+                return set()
 
-    def __repr__(self) -> str:
-        return "Puzzle()"
+        if self.get(at_column, at_row) is not EmptySpot:
+            # Can't add to the same spot twice
+            return set()
+
+        # Create a puzzle of the new size with EmptySpots if needed
+        new_width = max(self.width, at_column + 1)
+        new_height = max(self.height, at_row + 1)
+        puzzle = self
+        if new_width != puzzle.width or new_height != puzzle.height:
+            # puzzle = puzzle.expand_to(new_width, new_height)
+            puzzle = Puzzle(new_width, new_height)
+            for col, row in product(range(new_width), range(new_height)):
+                old_piece = self.get(col, row)
+                if old_piece is not EmptySpot:
+                    puzzle = puzzle.place_at(cast(OrientedPiece, old_piece), col, row)
+
+        puzzles = set()
+        for flip, turn in product((False, True), Turn):
+            orient = OrientedPiece(piece, flip, turn)
+            try:
+                new_puzzle = puzzle.place_at(orient, at_column, at_row)
+            except ValueError:
+                pass
+            else:
+                puzzles.add(new_puzzle)
+        return puzzles
+
+    def place_at(self, piece: OrientedPiece, at_column: int, at_row: int) -> "Puzzle":
+        """Place a piece, returning a new puzzle."""
+        if (
+            at_column < 0
+            or at_column >= self.width
+            or at_row < 0
+            or at_row >= self.height
+        ):
+            raise NotImplementedError("Resizing not implemented")
+
+        if self.get(at_column, at_row) is not EmptySpot:
+            raise ValueError("There is already a piece there.")
+
+        # Test against surrounding pieces
+        top = self.get(at_column, at_row - 1)
+        if top is not EmptySpot and not piece.fits_below(cast(OrientedPiece, top)):
+            raise ValueError("Does not fit with piece above")
+
+        right = self.get(at_column + 1, at_row)
+        if right is not EmptySpot and not piece.fits_left(cast(OrientedPiece, right)):
+            raise ValueError("Does not fit with piece to right")
+
+        bottom = self.get(at_column, at_row + 1)
+        if bottom is not EmptySpot and not piece.fits_above(
+            cast(OrientedPiece, bottom)
+        ):
+            raise ValueError("Does not fit with piece below")
+
+        left = self.get(at_column - 1, at_row)
+        if left is not EmptySpot and not piece.fits_right(cast(OrientedPiece, left)):
+            raise ValueError("Does not fit with piece to left")
+
+        pieces = list(self.pieces)
+        pieces[at_column + at_row * self.width] = piece
+        return Puzzle(self.width, self.height, tuple(pieces))
+
+
+def solve_puzzle(
+    rows: int, columns: int, pieces: Sequence[Piece], verbose: bool = False
+) -> Dict[int, Set[Puzzle]]:
+    assert rows * columns == len(pieces)
+
+    # puzzles_by_size: Dict[int, Set[Puzzle]] = {0: {Puzzle()}}
+    puzzles_by_size = {0: {Puzzle()}}
+    for size in range(1, (rows * columns) + 1):
+        # Determine the rows and columns for this attempt
+        at_row = int(floor((size - 1) / columns))
+        at_col = (size - 1) % columns
+        height = at_row + 1
+        width = min(size, at_col + 1)
+        if verbose:
+            print(
+                f"Looking for solutions for {size}-piece puzzle at {at_col}x{at_row} in {width}x{height} Puzzle"
+            )
+
+        last_puzzles = puzzles_by_size[size - 1]
+        next_puzzles = set()
+        for puzzle in last_puzzles:
+            for piece in pieces:
+                next_puzzles |= puzzle.fit_at(piece, at_col, at_row)
+        if verbose:
+            print(f"Found {len(next_puzzles)} {size}-piece puzzles. First 3:")
+            for puzzle in sorted(next_puzzles)[:3]:
+                print(puzzle)
+                print()
+
+        puzzles_by_size[size] = next_puzzles
+
+    return puzzles_by_size
 
 
 if __name__ == "__main__":
@@ -661,20 +791,4 @@ if __name__ == "__main__":
     possibilities = 8 ** len(pieces)
     print(f"{possibilities:,} possible combinations\n")
 
-    print("Finding pairs...")
-    row_pairs = set()
-    for piece in pieces:
-        for other in pieces:
-            row_pairs |= piece.row_pairs_with(other)
-    for row_pair in sorted(row_pairs):
-        print(f"  {row_pair}")
-    print(f"{len(row_pairs):,} row pairs\n")
-
-    print("Finding rows...")
-    rows = set()
-    for row_pair in row_pairs:
-        for piece in pieces:
-            rows |= row_pair.rows_with(piece)
-    for row in sorted(rows):
-        print(f"  {row}")
-    print(f"{len(rows):,} rows\n")
+    puzzles_by_size = solve_puzzle(3, 3, pieces, verbose=True)

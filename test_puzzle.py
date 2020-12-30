@@ -512,9 +512,7 @@ class TestPuzzle:
         assert puzzle.width == 0
         assert puzzle.height == 0
         assert puzzle.pieces == ()
-        with pytest.raises(IndexError):
-            puzzle.get(0, 0)
-
+        assert puzzle.get(0, 0) is EmptySpot
         assert str(puzzle) == "(Empty 0x0 Puzzle)"
         assert repr(puzzle) == "Puzzle()"
 
@@ -549,4 +547,10 @@ class TestPuzzle:
         assert puzzle.width == 2
         assert puzzle.height == 2
         assert puzzle.pieces == (op1, op2, op3, EmptySpot)
-        assert str(puzzle) == ("┌♥┬♠┐\n" "♡R♦R♦\n" "├♦┼♡┘\n" "♢R♣  \n" "└♧┘  ")
+        expected = """\
+┌♥┬♠┐
+♡R♦R♦
+├♦┼♡┘
+♢R♣  \n\
+└♧┘  """
+        assert str(puzzle) == expected
