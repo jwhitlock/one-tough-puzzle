@@ -4,7 +4,7 @@
 from enum import Enum, IntEnum
 from functools import total_ordering
 from itertools import product
-from typing import ClassVar, Dict, Tuple, Set
+from typing import ClassVar, Dict, Tuple, Set, Union, Type, cast
 
 
 class OrderedLabeledEnum(Enum):
@@ -70,6 +70,18 @@ class Edge(OrderedLabeledEnum):
     EAST = (1, "East")
     SOUTH = (2, "South")
     WEST = (3, "West")
+
+
+PIPS = {
+    (Shape.HEART, End.TAB): "♥",
+    (Shape.HEART, End.BLANK): "♡",
+    (Shape.DIAMOND, End.TAB): "♦",
+    (Shape.DIAMOND, End.BLANK): "♢",
+    (Shape.CLUB, End.TAB): "♣",
+    (Shape.CLUB, End.BLANK): "♧",
+    (Shape.SPADE, End.TAB): "♠",
+    (Shape.SPADE, End.BLANK): "♤",
+}
 
 
 class Orientation:
@@ -150,20 +162,9 @@ class Orientation:
             parts.extend([str(shape), str(end)])
         return f"{self.__class__.__name__}({', '.join(parts)})"
 
-    _pip: ClassVar[Dict[Tuple[Shape, End], str]] = {
-        (Shape.HEART, End.TAB): "♥",
-        (Shape.HEART, End.BLANK): "♡",
-        (Shape.DIAMOND, End.TAB): "♦",
-        (Shape.DIAMOND, End.BLANK): "♢",
-        (Shape.CLUB, End.TAB): "♣",
-        (Shape.CLUB, End.BLANK): "♧",
-        (Shape.SPADE, End.TAB): "♠",
-        (Shape.SPADE, End.BLANK): "♤",
-    }
-
     def __str__(self) -> str:
         parts = [self.side.label, "-"]
-        parts.extend([self._pip[edge] for edge in self.edges])
+        parts.extend([PIPS[edge] for edge in self.edges])
         return "".join(parts)
 
     def __eq__(self, other: object) -> bool:
@@ -414,6 +415,231 @@ class RowPair:
     def __hash__(self) -> int:
         return hash(self._pair)
 
+    def rows_with(self, piece: Piece) -> Set["Row"]:
+        if piece in [op.piece for op in self._pair]:
+            return set()
+
+        rows = set()
+        for flip, turn in product((False, True), Turn):
+            orient = OrientedPiece(piece, flip, turn)
+            if self.right.fits_right(orient):
+                rows.add(Row(self.left, self.right, orient))
+        return rows
+
+
+class Row:
+    def __init__(
+        self, left: OrientedPiece, middle: OrientedPiece, right: OrientedPiece
+    ):
+        self._row = (left, middle, right)
+
+    left = property(lambda self: self._row[0])
+    middle = property(lambda self: self._row[1])
+    right = property(lambda self: self._row[2])
+
+    def __str__(self) -> str:
+        return f"{self.left} → {self.middle} → {self.right}"
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}({self.left!r}, {self.middle!r}, {self.right!r})"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Row):
+            return NotImplemented
+        return self._row == other._row
+
+    def __ne__(self, other: object) -> bool:
+        if not isinstance(other, Row):
+            return NotImplemented
+        return self._row != other._row
+
+    def __ge__(self, other: "Row") -> bool:
+        return self._row >= other._row
+
+    def __gt__(self, other: "Row") -> bool:
+        return self._row > other._row
+
+    def __le__(self, other: "Row") -> bool:
+        return self._row <= other._row
+
+    def __lt__(self, other: "Row") -> bool:
+        return self._row < other._row
+
+    def __hash__(self) -> int:
+        return hash(self._row)
+
+
+class EmptySpot:
+    """A blank spot in a puzzle"""
+
+
+class Puzzle:
+    """A collection of OrientedPieces and EmptySpots that fit."""
+
+    def __init__(
+        self,
+        width: int = 0,
+        height: int = 0,
+        pieces: Union[None, Tuple[Union[OrientedPiece, Type[EmptySpot]], ...]] = None,
+    ):
+        if width or height:
+            width = max(1, width)
+            height = max(1, height)
+        if pieces is None:
+            pieces = ()
+        assert (width * height) >= len(pieces)
+        if (width * height) > len(pieces):
+            pieces += (EmptySpot,) * ((width * height) - len(pieces))
+        self._puzzle = (width, height) + pieces
+
+    width = property(lambda self: self._puzzle[0])
+    height = property(lambda self: self._puzzle[1])
+    pieces = property(lambda self: self._puzzle[2:])
+
+    def get(self, row: int, col: int) -> Union[OrientedPiece, Type[EmptySpot]]:
+        if row < 0 or col < 0 or row >= self.width or col >= self.height:
+            raise IndexError
+        return cast(
+            Union[OrientedPiece, Type[EmptySpot]], self.pieces[self.width * row + col]
+        )
+
+    def __str__(self) -> str:
+        """Draw the puzzle with unicode rank and box characters."""
+        empty = all(p is EmptySpot for p in self.pieces)
+        if empty:
+            return f"(Empty {self.width}x{self.height} Puzzle)"
+
+        col, row = 0, 0
+        top, middle, bottom = [], [], []
+        out = []
+        for piece in self.pieces:
+
+            # Check if surrounding spots are empty or pieces
+            above: Union[OrientedPiece, Type[EmptySpot]] = EmptySpot
+            if row != 0:
+                above = self.get(row - 1, col)
+            above_empty = above is EmptySpot
+
+            left: Union[OrientedPiece, Type[EmptySpot]] = EmptySpot
+            if col != 0:
+                left = self.get(row, col - 1)
+            left_empty = left is EmptySpot
+
+            is_last_row = row == (self.width - 1)
+            is_last_col = col == (self.height - 1)
+
+            is_empty = piece is EmptySpot
+            if is_empty:
+                if above_empty:
+                    n_char = " "
+                else:
+                    n_char = PIPS[cast(OrientedPiece, above).south]
+                if left_empty:
+                    w_char = " "
+                else:
+                    w_char = PIPS[cast(OrientedPiece, left).east]
+                center_char = " "
+            else:
+                n_shape, n_end = piece.north
+                if not above_empty:
+                    n_end = End.TAB
+                n_char = PIPS[(n_shape, n_end)]
+
+                w_shape, w_end = piece.west
+                if not left_empty:
+                    w_end = End.TAB
+                w_char = PIPS[(w_shape, w_end)]
+                center_char = "R" if piece.side == Side.RED else "B"
+
+            nw_char = {
+                (False, False, False): "┼",
+                (False, False, True): "├",
+                (False, True, False): "┬",
+                (False, True, True): "┌",
+                (True, False, False): "┼",
+                (True, False, True): "┘",
+                (True, True, False): "┐",
+                (True, True, True): " ",
+            }
+            top.append(nw_char[(is_empty, above_empty, left_empty)])
+            top.append(n_char)
+            middle.append(w_char)
+            middle.append(center_char)
+
+            if is_last_col:
+                # Draw the right edge
+
+                # piece is empty, above is empty
+                ne_char = {
+                    (False, False): "┤",
+                    (False, True): "┐",
+                    (True, False): "┘",
+                    (True, True): " ",
+                }
+                top.append(ne_char[(is_empty, above_empty)])
+                if is_empty:
+                    middle.append(" ")
+                else:
+                    middle.append(PIPS[piece.east])
+
+            if is_last_row:
+                # Draw the bottom edge
+
+                # piece is empty, left is empty
+                sw_char = {
+                    (False, False): "┴",
+                    (False, True): "└",
+                    (True, False): "┘",
+                    (True, True): " ",
+                }
+                bottom.append(sw_char[(is_empty, left_empty)])
+                if is_empty:
+                    bottom.append(" ")
+                else:
+                    bottom.append(PIPS[piece.south])
+
+                if is_last_col:
+                    # Draw the bottom right corner
+                    if is_empty:
+                        bottom.append(" ")
+                    else:
+                        bottom.append("┘")
+
+            # Move to next spot
+            if is_last_col:
+                col = 0
+                row += 1
+
+                out.append("".join(top))
+                top = []
+                out.append("".join(middle))
+                middle = []
+                if is_last_row:
+                    out.append("".join(bottom))
+            else:
+                col += 1
+
+        return "\n".join(out)
+
+        col, row = 0, 0
+        # Create width x height grid of
+        width = self.width
+        grid = tuple(
+            self.pieces[x : x + width] for x in range(0, width * self.height, width)
+        )
+
+        out = ""
+        for row_num, row in enumerate(grid):
+            for col_num, col in enumerate(row):
+                out += f"[{row_num},{col_num}]"
+            out += "\n"
+        return out[:-1]
+
+    def __repr__(self) -> str:
+        return "Puzzle()"
+
 
 if __name__ == "__main__":
     pieces = sorted(
@@ -433,7 +659,7 @@ if __name__ == "__main__":
     for piece in pieces:
         print(f"  {piece}")
     possibilities = 8 ** len(pieces)
-    print(f"{possibilities:,} possible combinations")
+    print(f"{possibilities:,} possible combinations\n")
 
     print("Finding pairs...")
     row_pairs = set()
@@ -442,4 +668,13 @@ if __name__ == "__main__":
             row_pairs |= piece.row_pairs_with(other)
     for row_pair in sorted(row_pairs):
         print(f"  {row_pair}")
-    print(f"{len(row_pairs):,} row pairs")
+    print(f"{len(row_pairs):,} row pairs\n")
+
+    print("Finding rows...")
+    rows = set()
+    for row_pair in row_pairs:
+        for piece in pieces:
+            rows |= row_pair.rows_with(piece)
+    for row in sorted(rows):
+        print(f"  {row}")
+    print(f"{len(rows):,} rows\n")

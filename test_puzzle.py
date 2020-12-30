@@ -7,10 +7,13 @@ from puzzle import (
     Orientation,
     OrientedPiece,
     Piece,
+    Row,
     RowPair,
     Shape,
     Side,
     Turn,
+    Puzzle,
+    EmptySpot,
 )
 
 
@@ -454,3 +457,96 @@ class TestRowPair:
             " OrientedPiece(Piece("
             "Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)))"
         )
+
+    def test_rows_with(self) -> None:
+        piece1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
+        piece2 = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
+        op1 = OrientedPiece(piece1)
+        op2 = OrientedPiece(piece2)
+        rp = RowPair(op1, op2)
+
+        # Can not make a row with a piece in the pair
+        assert rp.rows_with(piece1) == set()
+        assert rp.rows_with(piece2) == set()
+
+        piece3 = Piece(Shape.SPADE, Shape.SPADE, Shape.HEART, Shape.CLUB)
+        assert rp.rows_with(piece3) == set()
+
+        piece4 = Piece(Shape.DIAMOND, Shape.CLUB, Shape.CLUB, Shape.DIAMOND)
+        expected = [
+            Row(
+                OrientedPiece(piece1),
+                OrientedPiece(piece2),
+                OrientedPiece(piece4),
+            ),
+            Row(
+                OrientedPiece(piece1),
+                OrientedPiece(piece2),
+                OrientedPiece(piece4, flip=True, turn=Turn.TURN_180),
+            ),
+        ]
+        assert sorted(expected) == expected
+        assert rp.rows_with(piece4) == set(expected)
+
+
+class TestRow:
+    def test_init(self) -> None:
+        piece1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
+        piece2 = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
+        piece3 = Piece(Shape.SPADE, Shape.SPADE, Shape.HEART, Shape.CLUB)
+        row = Row(OrientedPiece(piece1), OrientedPiece(piece2), OrientedPiece(piece3))
+        assert str(row) == "Red-♥♦♢♡ → Red-♠♦♡♢ → Red-♠♠♡♧"
+        assert repr(row) == (
+            "Row(OrientedPiece(Piece("
+            "Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)),"
+            " OrientedPiece(Piece("
+            "Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)),"
+            " OrientedPiece(Piece("
+            "Shape.SPADE, Shape.SPADE, Shape.HEART, Shape.CLUB)))"
+        )
+
+
+class TestPuzzle:
+    def test_init_default(self) -> None:
+        puzzle = Puzzle()
+        assert puzzle.width == 0
+        assert puzzle.height == 0
+        assert puzzle.pieces == ()
+        with pytest.raises(IndexError):
+            puzzle.get(0, 0)
+
+        assert str(puzzle) == "(Empty 0x0 Puzzle)"
+        assert repr(puzzle) == "Puzzle()"
+
+    def test_init_blank(self) -> None:
+        puzzle = Puzzle(1, 1)
+        assert puzzle.width == 1
+        assert puzzle.height == 1
+        assert puzzle.pieces == (EmptySpot,)
+        assert puzzle.get(0, 0) is EmptySpot
+        assert str(puzzle) == "(Empty 1x1 Puzzle)"
+        assert repr(puzzle) == "Puzzle()"
+
+    def test_init_piece(self) -> None:
+        piece = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
+        op = OrientedPiece(piece)
+        puzzle = Puzzle(1, 1, (op,))
+        assert puzzle.width == 1
+        assert puzzle.height == 1
+        assert puzzle.pieces == (op,)
+        assert str(puzzle) == ("┌♥┐\n" "♡R♦\n" "└♢┘")
+
+    def test_init_missing_piece(self) -> None:
+        op1 = OrientedPiece(
+            Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
+        )
+        op2 = OrientedPiece(
+            Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
+        )
+        op3 = OrientedPiece(Piece(Shape.DIAMOND, Shape.CLUB, Shape.CLUB, Shape.DIAMOND))
+
+        puzzle = Puzzle(2, 2, (op1, op2, op3))
+        assert puzzle.width == 2
+        assert puzzle.height == 2
+        assert puzzle.pieces == (op1, op2, op3, EmptySpot)
+        assert str(puzzle) == ("┌♥┬♠┐\n" "♡R♦R♦\n" "├♦┼♡┘\n" "♢R♣  \n" "└♧┘  ")
