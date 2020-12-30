@@ -1,5 +1,7 @@
 """Tests for puzzle.py"""
 
+from typing import Tuple
+
 import pytest
 
 from puzzle import (
@@ -14,6 +16,7 @@ from puzzle import (
     Turn,
     Puzzle,
     EmptySpot,
+    solve_puzzle,
 )
 
 
@@ -43,60 +46,54 @@ class TestTurn:
         assert Turn.NO_TURN < Turn.TURN_90 < Turn.TURN_180 < Turn.TURN_270
 
 
+@pytest.fixture
+def standard_orientation() -> Orientation:
+    return Orientation(
+        Side.RED,
+        Shape.HEART,
+        End.TAB,
+        Shape.DIAMOND,
+        End.TAB,
+        Shape.DIAMOND,
+        End.BLANK,
+        Shape.HEART,
+        End.BLANK,
+    )
+
+
 class TestOrientation:
-    def test_standard_orientation(self) -> None:
+    def test_standard_orientation(self, standard_orientation: Orientation) -> None:
         """Test an Orientation initialized to standard orientation"""
-        orient = Orientation(
-            Side.RED,
-            Shape.HEART,
-            End.TAB,
-            Shape.DIAMOND,
-            End.TAB,
-            Shape.DIAMOND,
-            End.BLANK,
-            Shape.HEART,
-            End.BLANK,
-        )
-        assert orient.is_valid()
-        assert orient.is_standard()
-        standard = orient.to_standard()
-        assert standard == orient
-        assert str(orient) == "Red-♥♦♢♡"
-        assert repr(orient) == (
+        assert standard_orientation.is_valid()
+        assert standard_orientation.is_standard()
+        as_standard = standard_orientation.to_standard()
+        assert as_standard == standard_orientation
+        assert str(standard_orientation) == "Red-♥♦♢♡"
+        assert repr(standard_orientation) == (
             "Orientation(Side.RED,"
             " Shape.HEART, End.TAB, Shape.DIAMOND, End.TAB,"
             " Shape.DIAMOND, End.BLANK, Shape.HEART, End.BLANK)"
         )
-        assert orient.side == Side.RED
+        assert standard_orientation.side == Side.RED
 
-        assert orient.north == (Shape.HEART, End.TAB)
-        assert orient.east == (Shape.DIAMOND, End.TAB)
-        assert orient.south == (Shape.DIAMOND, End.BLANK)
-        assert orient.west == (Shape.HEART, End.BLANK)
+        assert standard_orientation.north == (Shape.HEART, End.TAB)
+        assert standard_orientation.east == (Shape.DIAMOND, End.TAB)
+        assert standard_orientation.south == (Shape.DIAMOND, End.BLANK)
+        assert standard_orientation.west == (Shape.HEART, End.BLANK)
 
-        assert orient.north_shape == Shape.HEART
-        assert orient.east_shape == Shape.DIAMOND
-        assert orient.south_shape == Shape.DIAMOND
-        assert orient.west_shape == Shape.HEART
+        assert standard_orientation.north_shape == Shape.HEART
+        assert standard_orientation.east_shape == Shape.DIAMOND
+        assert standard_orientation.south_shape == Shape.DIAMOND
+        assert standard_orientation.west_shape == Shape.HEART
 
-        assert orient.north_end == End.TAB
-        assert orient.east_end == End.TAB
-        assert orient.south_end == End.BLANK
-        assert orient.west_end == End.BLANK
+        assert standard_orientation.north_end == End.TAB
+        assert standard_orientation.east_end == End.TAB
+        assert standard_orientation.south_end == End.BLANK
+        assert standard_orientation.west_end == End.BLANK
 
-    def test_rotated_90(self) -> None:
+    def test_rotated_90(self, standard_orientation: Orientation) -> None:
         """Test an Orientation rotated 90 from standard orientation"""
-        orient = Orientation(
-            Side.RED,
-            Shape.HEART,
-            End.BLANK,
-            Shape.HEART,
-            End.TAB,
-            Shape.DIAMOND,
-            End.TAB,
-            Shape.DIAMOND,
-            End.BLANK,
-        )
+        orient = standard_orientation.reorient(turn=Turn.TURN_90)
         assert orient.is_valid()
         assert not orient.is_standard()
         standard = orient.to_standard()
@@ -105,19 +102,9 @@ class TestOrientation:
         assert standard == rotated
         assert str(orient) == "Red-♡♥♦♢"
 
-    def test_flipped(self) -> None:
+    def test_flipped(self, standard_orientation: Orientation) -> None:
         """Test an Orientation flipped from standard orientation"""
-        orient = Orientation(
-            Side.BLACK,
-            Shape.HEART,
-            End.TAB,
-            Shape.HEART,
-            End.BLANK,
-            Shape.DIAMOND,
-            End.BLANK,
-            Shape.DIAMOND,
-            End.TAB,
-        )
+        orient = standard_orientation.reorient(flip=True)
         assert orient.is_valid()
         assert not orient.is_standard()
         standard = orient.to_standard()
@@ -126,25 +113,10 @@ class TestOrientation:
         assert standard == rotated
         assert str(orient) == "Black-♥♡♢♦"
 
-    def test_reorientation(self) -> None:
+    def test_reorientation(self, standard_orientation: Orientation) -> None:
         """Test reorientation."""
-        orient = Orientation(
-            Side.RED,
-            Shape.HEART,
-            End.TAB,
-            Shape.DIAMOND,
-            End.TAB,
-            Shape.DIAMOND,
-            End.BLANK,
-            Shape.HEART,
-            End.BLANK,
-        )
-        assert orient.is_valid()
-        assert orient.is_standard()
-        assert str(orient) == "Red-♥♦♢♡"
-
         # Turn 90 (clockwise) four times
-        rotated = orient.reorient(turn=Turn.TURN_90)
+        rotated = standard_orientation.reorient(turn=Turn.TURN_90)
         assert str(rotated) == "Red-♡♥♦♢"
         rotated = rotated.reorient(turn=Turn.TURN_90)
         assert str(rotated) == "Red-♢♡♥♦"
@@ -152,17 +124,17 @@ class TestOrientation:
         assert str(rotated) == "Red-♦♢♡♥"
         rotated = rotated.reorient(turn=Turn.TURN_90)
         assert str(rotated) == "Red-♥♦♢♡"
-        assert rotated == orient
+        assert rotated == standard_orientation
 
         # Turn 180 twice
-        rotated = orient.reorient(turn=Turn.TURN_180)
+        rotated = standard_orientation.reorient(turn=Turn.TURN_180)
         assert str(rotated) == "Red-♢♡♥♦"
         rotated = rotated.reorient(turn=Turn.TURN_180)
         assert str(rotated) == "Red-♥♦♢♡"
-        assert rotated == orient
+        assert rotated == standard_orientation
 
         # Turn 270 four times
-        rotated = orient.reorient(turn=Turn.TURN_270)
+        rotated = standard_orientation.reorient(turn=Turn.TURN_270)
         assert str(rotated) == "Red-♦♢♡♥"
         rotated = rotated.reorient(turn=Turn.TURN_270)
         assert str(rotated) == "Red-♢♡♥♦"
@@ -170,21 +142,21 @@ class TestOrientation:
         assert str(rotated) == "Red-♡♥♦♢"
         rotated = rotated.reorient(turn=Turn.TURN_270)
         assert str(rotated) == "Red-♥♦♢♡"
-        assert rotated == orient
+        assert rotated == standard_orientation
 
         # Flip (Left to Right)
-        flipped = orient.reorient(flip=True)
+        flipped = standard_orientation.reorient(flip=True)
         assert str(flipped) == "Black-♥♡♢♦"
         flipped = flipped.reorient(flip=True)
         assert str(flipped) == "Red-♥♦♢♡"
-        assert flipped == orient
+        assert flipped == standard_orientation
 
         # Flip then rotate
-        flipped = orient.reorient(flip=True, turn=Turn.TURN_90)
+        flipped = standard_orientation.reorient(flip=True, turn=Turn.TURN_90)
         assert str(flipped) == "Black-♦♥♡♢"
         flipped = flipped.reorient(flip=True, turn=Turn.TURN_90)
         assert str(flipped) == "Red-♥♦♢♡"
-        assert flipped == orient
+        assert flipped == standard_orientation
 
     def test_invalid(self) -> None:
         invalid = Orientation(
@@ -200,7 +172,7 @@ class TestOrientation:
         )
         assert not invalid.is_valid()
 
-    def test_order(self) -> None:
+    def test_order(self, standard_orientation: Orientation) -> None:
         or_least = Orientation(
             Side.RED,
             Shape.CLUB,
@@ -212,45 +184,58 @@ class TestOrientation:
             Shape.CLUB,
             End.TAB,
         )
-        or_least2 = Orientation(
-            Side.RED,
-            Shape.CLUB,
-            End.TAB,
-            Shape.CLUB,
-            End.TAB,
-            Shape.CLUB,
-            End.TAB,
-            Shape.DIAMOND,
-            End.TAB,
-        )
-        assert or_least < or_least2
-        assert or_least2 > or_least
+        assert or_least < standard_orientation
+        assert standard_orientation > or_least
+
+
+@pytest.fixture
+def otp_pieces() -> Tuple[Piece, ...]:
+    return (
+        Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND),
+        Piece(Shape.CLUB, Shape.HEART, Shape.SPADE, Shape.HEART),
+        Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART),
+        Piece(Shape.DIAMOND, Shape.CLUB, Shape.CLUB, Shape.DIAMOND),
+        Piece(Shape.SPADE, Shape.SPADE, Shape.HEART, Shape.CLUB),
+        Piece(Shape.SPADE, Shape.DIAMOND, Shape.SPADE, Shape.HEART),
+        Piece(Shape.HEART, Shape.DIAMOND, Shape.CLUB, Shape.CLUB),
+        Piece(Shape.CLUB, Shape.HEART, Shape.DIAMOND, Shape.CLUB),
+        Piece(Shape.HEART, Shape.SPADE, Shape.SPADE, Shape.CLUB),
+    )
+
+
+@pytest.fixture
+def piece4(otp_pieces: Tuple[Piece, ...]) -> Piece:
+    return otp_pieces[3]
+
+
+@pytest.fixture
+def piece9(otp_pieces: Tuple[Piece, ...]) -> Piece:
+    return otp_pieces[8]
 
 
 class TestPieces:
-    def test_default_init(self) -> None:
+    def test_default_init(self, piece9: Piece) -> None:
         """Default is the standard orientation"""
-        piece = Piece(Shape.HEART, Shape.SPADE, Shape.SPADE, Shape.CLUB)
-        assert str(piece) == "Red-♥♠♤♧"
-        assert repr(piece) == (
+        assert str(piece9) == "Red-♥♠♤♧"
+        assert repr(piece9) == (
             "Piece(Shape.HEART, Shape.SPADE, Shape.SPADE, Shape.CLUB)"
         )
-        assert piece.side == Side.RED
+        assert piece9.side == Side.RED
 
-        assert piece.north == (Shape.HEART, End.TAB)
-        assert piece.east == (Shape.SPADE, End.TAB)
-        assert piece.south == (Shape.SPADE, End.BLANK)
-        assert piece.west == (Shape.CLUB, End.BLANK)
+        assert piece9.north == (Shape.HEART, End.TAB)
+        assert piece9.east == (Shape.SPADE, End.TAB)
+        assert piece9.south == (Shape.SPADE, End.BLANK)
+        assert piece9.west == (Shape.CLUB, End.BLANK)
 
-        assert piece.north_shape == Shape.HEART
-        assert piece.east_shape == Shape.SPADE
-        assert piece.south_shape == Shape.SPADE
-        assert piece.west_shape == Shape.CLUB
+        assert piece9.north_shape == Shape.HEART
+        assert piece9.east_shape == Shape.SPADE
+        assert piece9.south_shape == Shape.SPADE
+        assert piece9.west_shape == Shape.CLUB
 
-        assert piece.north_end == End.TAB
-        assert piece.east_end == End.TAB
-        assert piece.south_end == End.BLANK
-        assert piece.west_end == End.BLANK
+        assert piece9.north_end == End.TAB
+        assert piece9.east_end == End.TAB
+        assert piece9.south_end == End.BLANK
+        assert piece9.west_end == End.BLANK
 
     def test_full_init(self) -> None:
         """A non-standard orientation is converted to standard."""
@@ -269,71 +254,6 @@ class TestPieces:
         assert repr(piece) == (
             "Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)"
         )
-
-    def test_fits_none(self) -> None:
-        """A piece with no matches has no fits."""
-        piece1 = Piece(
-            Shape.SPADE,
-            Shape.DIAMOND,
-            Shape.SPADE,
-            Shape.DIAMOND,
-        )
-        piece2 = Piece(
-            Shape.CLUB,
-            Shape.HEART,
-            Shape.CLUB,
-            Shape.HEART,
-        )
-        assert str(piece1) == "Red-♠♦♤♢"
-        assert str(piece2) == "Red-♣♥♧♡"
-        assert piece1.row_pairs_with(piece2) == set()
-
-    def test_fit_one_side(self) -> None:
-        """A piece with one possible matching side fits 4 ways."""
-        piece1 = Piece(
-            Shape.DIAMOND,
-            Shape.HEART,
-            Shape.HEART,
-            Shape.HEART,
-        )
-        piece2 = Piece(
-            Shape.CLUB,
-            Shape.CLUB,
-            Shape.DIAMOND,
-            Shape.CLUB,
-        )
-        assert str(piece1) == "Red-♦♥♡♡"
-        assert str(piece2) == "Red-♣♣♢♧"
-        expected = [
-            RowPair(
-                OrientedPiece(piece1, turn=Turn.TURN_90),
-                OrientedPiece(piece2, turn=Turn.TURN_90),
-            ),
-            RowPair(
-                OrientedPiece(piece1, turn=Turn.TURN_90),
-                OrientedPiece(piece2, flip=True, turn=Turn.TURN_90),
-            ),
-            RowPair(
-                OrientedPiece(piece1, flip=True, turn=Turn.TURN_90),
-                OrientedPiece(piece2, turn=Turn.TURN_90),
-            ),
-            RowPair(
-                OrientedPiece(piece1, flip=True, turn=Turn.TURN_90),
-                OrientedPiece(piece2, flip=True, turn=Turn.TURN_90),
-            ),
-        ]
-        assert sorted(expected) == expected
-        assert piece1.row_pairs_with(piece2) == set(expected)
-
-    def test_no_fit_self(self) -> None:
-        """A piece doesn't fit itself."""
-        piece = Piece(
-            Shape.HEART,
-            Shape.HEART,
-            Shape.HEART,
-            Shape.HEART,
-        )
-        assert piece.row_pairs_with(piece) == set()
 
 
 class TestOrientedPiece:
@@ -523,7 +443,7 @@ class TestPuzzle:
         assert puzzle.pieces == (EmptySpot,)
         assert puzzle.get(0, 0) is EmptySpot
         assert str(puzzle) == "(Empty 1x1 Puzzle)"
-        assert repr(puzzle) == "Puzzle()"
+        assert repr(puzzle) == "Puzzle(1, 1)"
 
     def test_init_piece(self) -> None:
         piece = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
@@ -532,7 +452,17 @@ class TestPuzzle:
         assert puzzle.width == 1
         assert puzzle.height == 1
         assert puzzle.pieces == (op,)
-        assert str(puzzle) == ("┌♥┐\n" "♡R♦\n" "└♢┘")
+        assert (
+            str(puzzle)
+            == """\
+┌♥┐
+♡R♦
+└♢┘"""
+        )
+        assert (
+            repr(puzzle)
+            == "Puzzle(1, 1, (OrientedPiece(Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)),))"
+        )
 
     def test_init_missing_piece(self) -> None:
         op1 = OrientedPiece(
@@ -554,3 +484,91 @@ class TestPuzzle:
 ♢R♣  \n\
 └♧┘  """
         assert str(puzzle) == expected
+
+
+class TestSolvePuzzle:
+    def test_fit_one_side(self, piece4: Piece, piece9: Piece) -> None:
+        """A piece with one possible matching side fits 4 ways."""
+        assert str(piece4) == "Red-♦♣♧♢"
+        assert str(piece9) == "Red-♥♠♤♧"
+        expected = [
+            Puzzle(2, 1, (OrientedPiece(piece9), OrientedPiece(piece4))),
+            Puzzle(
+                2,
+                1,
+                (
+                    OrientedPiece(piece9),
+                    OrientedPiece(piece4, flip=True, turn=Turn.TURN_180),
+                ),
+            ),
+            Puzzle(
+                2,
+                1,
+                (
+                    OrientedPiece(piece4, turn=Turn.TURN_180),
+                    OrientedPiece(piece9, turn=Turn.TURN_180),
+                ),
+            ),
+            Puzzle(
+                2,
+                1,
+                (
+                    OrientedPiece(piece4, turn=Turn.TURN_180),
+                    OrientedPiece(piece9, flip=True),
+                ),
+            ),
+            Puzzle(
+                2,
+                1,
+                (
+                    OrientedPiece(piece4, flip=True),
+                    OrientedPiece(piece9, turn=Turn.TURN_180),
+                ),
+            ),
+            Puzzle(
+                2,
+                1,
+                (OrientedPiece(piece4, flip=True), OrientedPiece(piece9, flip=True)),
+            ),
+            Puzzle(
+                2,
+                1,
+                (
+                    OrientedPiece(piece9, flip=True, turn=Turn.TURN_180),
+                    OrientedPiece(piece4),
+                ),
+            ),
+            Puzzle(
+                2,
+                1,
+                (
+                    OrientedPiece(piece9, flip=True, turn=Turn.TURN_180),
+                    OrientedPiece(piece4, flip=True, turn=Turn.TURN_180),
+                ),
+            ),
+        ]
+        assert sorted(expected) == expected
+        puzzles = solve_puzzle(1, 2, (piece4, piece9))
+        assert puzzles == set(expected)
+
+    def test_no_fit_self(self, piece4: Piece) -> None:
+        """A piece doesn't fit itself."""
+        assert solve_puzzle(1, 2, (piece4, piece4)) == set()
+
+    def test_fits_none(self) -> None:
+        """A piece with no matches has no fits."""
+        piece1 = Piece(
+            Shape.SPADE,
+            Shape.DIAMOND,
+            Shape.SPADE,
+            Shape.DIAMOND,
+        )
+        piece2 = Piece(
+            Shape.CLUB,
+            Shape.HEART,
+            Shape.CLUB,
+            Shape.HEART,
+        )
+        assert str(piece1) == "Red-♠♦♤♢"
+        assert str(piece2) == "Red-♣♥♧♡"
+        assert solve_puzzle(1, 2, (piece1, piece2)) == set()

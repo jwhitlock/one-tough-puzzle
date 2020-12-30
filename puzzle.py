@@ -305,17 +305,6 @@ class Piece(Orientation):
         """Use defaults for repr"""
         return f"{self.__class__.__name__}({', '.join(str(s) for s in self.shapes)})"
 
-    def row_pairs_with(self, other: "Piece") -> Set["RowPair"]:
-        """Return pairs where this fits with the other piece."""
-        combos = product((False, True), Turn, (False, True), Turn)
-        fits = set()
-        for flip, turn, other_flip, other_turn in combos:
-            orient = OrientedPiece(self, flip, turn)
-            other_orient = OrientedPiece(other, other_flip, other_turn)
-            if orient.fits_right(other_orient):
-                fits.add(RowPair(orient, other_orient))
-        return fits
-
 
 class OrientedPiece(Orientation):
     """A puzzle piece in a particular orientation."""
@@ -513,7 +502,13 @@ class Puzzle:
     pieces = property(lambda self: self._puzzle[2:])
 
     def __repr__(self) -> str:
-        return "Puzzle()"
+        bits = []
+        all_empty = all(piece is EmptySpot for piece in self.pieces)
+        if self.width != 0 or self.height != 0 or not all_empty:
+            bits.extend([str(self.width), str(self.height)])
+        if not all_empty:
+            bits.append(str(self.pieces))
+        return f"Puzzle({', '.join(bits)})"
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Puzzle):
@@ -737,7 +732,7 @@ class Puzzle:
         return Puzzle(self.width, self.height, tuple(pieces))
 
 
-def solve_puzzle(
+def solve_puzzle_with_details(
     rows: int, columns: int, pieces: Sequence[Piece], verbose: bool = False
 ) -> Dict[int, Set[Puzzle]]:
     assert rows * columns == len(pieces)
@@ -769,6 +764,13 @@ def solve_puzzle(
         puzzles_by_size[size] = next_puzzles
 
     return puzzles_by_size
+
+
+def solve_puzzle(
+    rows: int, columns: int, pieces: Sequence[Piece], verbose: bool = False
+) -> Set[Puzzle]:
+    puzzles_by_size = solve_puzzle_with_details(rows, columns, pieces, verbose)
+    return puzzles_by_size[len(pieces)]
 
 
 if __name__ == "__main__":
