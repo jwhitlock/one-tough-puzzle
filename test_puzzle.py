@@ -487,65 +487,45 @@ class TestPuzzle:
 
 
 class TestSolvePuzzle:
-    def test_fit_one_side(self, piece4: Piece, piece9: Piece) -> None:
-        """A piece with one possible matching side fits 4 ways."""
+    def test_fit_left_right(self, piece4: Piece, piece9: Piece) -> None:
+        """A piece with one possible matching side fits 8 ways."""
         assert str(piece4) == "Red-♦♣♧♢"
         assert str(piece9) == "Red-♥♠♤♧"
+        expected_orientations = [
+            (piece9, False, Turn.NO_TURN, piece4, False, Turn.NO_TURN),
+            (piece9, False, Turn.NO_TURN, piece4, True, Turn.TURN_180),
+            (piece4, False, Turn.TURN_180, piece9, False, Turn.TURN_180),
+            (piece4, False, Turn.TURN_180, piece9, True, Turn.NO_TURN),
+            (piece4, True, Turn.NO_TURN, piece9, False, Turn.TURN_180),
+            (piece4, True, Turn.NO_TURN, piece9, True, Turn.NO_TURN),
+            (piece9, True, Turn.TURN_180, piece4, False, Turn.NO_TURN),
+            (piece9, True, Turn.TURN_180, piece4, True, Turn.TURN_180),
+        ]
         expected = [
-            Puzzle(2, 1, (OrientedPiece(piece9), OrientedPiece(piece4))),
-            Puzzle(
-                2,
-                1,
-                (
-                    OrientedPiece(piece9),
-                    OrientedPiece(piece4, flip=True, turn=Turn.TURN_180),
-                ),
-            ),
-            Puzzle(
-                2,
-                1,
-                (
-                    OrientedPiece(piece4, turn=Turn.TURN_180),
-                    OrientedPiece(piece9, turn=Turn.TURN_180),
-                ),
-            ),
-            Puzzle(
-                2,
-                1,
-                (
-                    OrientedPiece(piece4, turn=Turn.TURN_180),
-                    OrientedPiece(piece9, flip=True),
-                ),
-            ),
-            Puzzle(
-                2,
-                1,
-                (
-                    OrientedPiece(piece4, flip=True),
-                    OrientedPiece(piece9, turn=Turn.TURN_180),
-                ),
-            ),
-            Puzzle(
-                2,
-                1,
-                (OrientedPiece(piece4, flip=True), OrientedPiece(piece9, flip=True)),
-            ),
-            Puzzle(
-                2,
-                1,
-                (
-                    OrientedPiece(piece9, flip=True, turn=Turn.TURN_180),
-                    OrientedPiece(piece4),
-                ),
-            ),
-            Puzzle(
-                2,
-                1,
-                (
-                    OrientedPiece(piece9, flip=True, turn=Turn.TURN_180),
-                    OrientedPiece(piece4, flip=True, turn=Turn.TURN_180),
-                ),
-            ),
+            Puzzle(2, 1, (OrientedPiece(p1, f1, t1), OrientedPiece(p2, f2, t2)))
+            for p1, f1, t1, p2, f2, t2 in expected_orientations
+        ]
+        assert sorted(expected) == expected
+        puzzles = solve_puzzle(2, 1, (piece4, piece9))
+        assert puzzles == set(expected)
+
+    def test_fit_top_bottom(self, piece4: Piece, piece9: Piece) -> None:
+        """A piece with one possible matching side fits 8 ways."""
+        assert str(piece4) == "Red-♦♣♧♢"
+        assert str(piece9) == "Red-♥♠♤♧"
+        expected_orientations = [
+            (piece9, False, Turn.TURN_270, piece4, False, Turn.TURN_270),
+            (piece9, False, Turn.TURN_270, piece4, True, Turn.TURN_90),
+            (piece4, False, Turn.TURN_90, piece9, False, Turn.TURN_90),
+            (piece4, False, Turn.TURN_90, piece9, True, Turn.TURN_270),
+            (piece9, True, Turn.TURN_90, piece4, False, Turn.TURN_270),
+            (piece9, True, Turn.TURN_90, piece4, True, Turn.TURN_90),
+            (piece4, True, Turn.TURN_270, piece9, False, Turn.TURN_90),
+            (piece4, True, Turn.TURN_270, piece9, True, Turn.TURN_270),
+        ]
+        expected = [
+            Puzzle(1, 2, (OrientedPiece(p1, f1, t1), OrientedPiece(p2, f2, t2)))
+            for p1, f1, t1, p2, f2, t2 in expected_orientations
         ]
         assert sorted(expected) == expected
         puzzles = solve_puzzle(1, 2, (piece4, piece9))
@@ -557,18 +537,8 @@ class TestSolvePuzzle:
 
     def test_fits_none(self) -> None:
         """A piece with no matches has no fits."""
-        piece1 = Piece(
-            Shape.SPADE,
-            Shape.DIAMOND,
-            Shape.SPADE,
-            Shape.DIAMOND,
-        )
-        piece2 = Piece(
-            Shape.CLUB,
-            Shape.HEART,
-            Shape.CLUB,
-            Shape.HEART,
-        )
+        piece1 = Piece(Shape.SPADE, Shape.DIAMOND, Shape.SPADE, Shape.DIAMOND)
+        piece2 = Piece(Shape.CLUB, Shape.HEART, Shape.CLUB, Shape.HEART)
         assert str(piece1) == "Red-♠♦♤♢"
         assert str(piece2) == "Red-♣♥♧♡"
         assert solve_puzzle(1, 2, (piece1, piece2)) == set()

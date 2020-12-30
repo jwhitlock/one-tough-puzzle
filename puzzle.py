@@ -733,7 +733,7 @@ class Puzzle:
 
 
 def solve_puzzle_with_details(
-    rows: int, columns: int, pieces: Sequence[Piece], verbose: bool = False
+    columns: int, rows: int, pieces: Sequence[Piece], verbose: bool = False
 ) -> Dict[int, Set[Puzzle]]:
     assert rows * columns == len(pieces)
 
@@ -741,10 +741,10 @@ def solve_puzzle_with_details(
     puzzles_by_size = {0: {Puzzle()}}
     for size in range(1, (rows * columns) + 1):
         # Determine the rows and columns for this attempt
-        at_row = int(floor((size - 1) / columns))
         at_col = (size - 1) % columns
-        height = at_row + 1
+        at_row = int(floor((size - 1) / columns))
         width = min(size, at_col + 1)
+        height = at_row + 1
         if verbose:
             print(
                 f"Looking for solutions for {size}-piece puzzle at {at_col}x{at_row} in {width}x{height} Puzzle"
@@ -767,9 +767,9 @@ def solve_puzzle_with_details(
 
 
 def solve_puzzle(
-    rows: int, columns: int, pieces: Sequence[Piece], verbose: bool = False
+    columns: int, rows: int, pieces: Sequence[Piece], verbose: bool = False
 ) -> Set[Puzzle]:
-    puzzles_by_size = solve_puzzle_with_details(rows, columns, pieces, verbose)
+    puzzles_by_size = solve_puzzle_with_details(columns, rows, pieces, verbose)
     return puzzles_by_size[len(pieces)]
 
 
