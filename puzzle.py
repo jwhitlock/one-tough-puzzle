@@ -360,6 +360,51 @@ class BaseOrientedPiece:
     def __ne__(self, other: object) -> bool:
         return not self == other
 
+    def fits_neighbors(
+        self, neighbors: Dict[Edge, "BaseOrientedPiece"]
+    ) -> Dict[Edge, bool]:
+        return {
+            Edge.NORTH: self.fits_above(neighbors[Edge.NORTH]),
+            Edge.EAST: self.fits_right(neighbors[Edge.EAST]),
+            Edge.SOUTH: self.fits_below(neighbors[Edge.SOUTH]),
+            Edge.WEST: self.fits_left(neighbors[Edge.WEST]),
+        }
+
+    @property
+    def is_empty(self) -> bool:
+        return self.piece is None
+
+    def fits_all_neighbors(self, neighbors: Dict[Edge, "BaseOrientedPiece"]) -> bool:
+        return all(self.fits_neighbors(neighbors).values())
+
+    def fits_right(self, other: object) -> bool:
+        attr = getattr(super(), "fits_right")
+        if attr:
+            return bool(attr(other))
+        else:
+            raise NotImplementedError("fits_right")
+
+    def fits_left(self, other: object) -> bool:
+        attr = getattr(super(), "fits_left")
+        if attr:
+            return bool(attr(other))
+        else:
+            raise NotImplementedError("fits_left")
+
+    def fits_below(self, other: object) -> bool:
+        attr = getattr(super(), "fits_below")
+        if attr:
+            return bool(attr(other))
+        else:
+            raise NotImplementedError("fits_below")
+
+    def fits_above(self, other: object) -> bool:
+        attr = getattr(super(), "fits_above")
+        if attr:
+            return bool(attr(other))
+        else:
+            raise NotImplementedError("fits_above")
+
 
 class EmptySpot(BaseOrientedPiece):
     """An empty spot in the puzzle."""
@@ -403,6 +448,7 @@ class OrientedPiece(BaseOrientedPiece, Orientation):
     """A puzzle piece in a particular orientation."""
 
     def __init__(self, piece: Piece, flip: bool = False, turn: Turn = Turn.NO_TURN):
+        assert piece is not None
         self.piece = piece
         self.flip = flip
         self.turn = turn
@@ -577,12 +623,12 @@ class Puzzle:
         self,
         width: int = 0,
         height: int = 0,
-        pieces: Union[None, Tuple[Union[OrientedPiece, Type[EmptySpot]], ...]] = None,
+        pieces: Union[None, Tuple[BaseOrientedPiece, ...]] = None,
     ):
         if width < 0:
-            raise ValueError("negative width is not allowed")
+            raise ValueError("Negative width is not allowed")
         if height < 0:
-            raise ValueError("negative height is not allowed")
+            raise ValueError("Negative height is not allowed")
         if width == 0 and height > 0:
             raise ValueError("width must be positive since height is positive")
         if height == 0 and width > 0:
@@ -592,21 +638,38 @@ class Puzzle:
             pieces = ()
         if len(pieces) > (width * height):
             raise ValueError(
-                f"{len(pieces)} will not fit in a puzzle of width {width}, height {height}"
+                f"{len(pieces)} pieces will not fit in a puzzle of size"
+                f" {width * height} (width {width}, height {height})"
             )
         # Fill out empty spaces
         if (width * height) > len(pieces):
-            pieces += (EmptySpot,) * ((width * height) - len(pieces))
+            pieces += (EmptySpot(),) * ((width * height) - len(pieces))
 
         self._puzzle = (width, height) + pieces
 
+        # Verify pieces fit
+        for col, row in product(range(width), range(height)):
+            piece = self.get(col, row)
+            neighbors = self.get_neighbors(col, row)
+            fits = piece.fits_neighbors(neighbors)
+            if not all(fits.values()):
+                edges = [edge for edge, fit in fits.items() if not fit]
+                edge_msgs = [f"{edge} is {neighbors[edge]}" for edge in edges]
+                raise ValueError(
+                    f"Piece {piece} does not fit at col {col}, row {row}:"
+                    f" {', '.join(edge_msgs)}"
+                )
+
     width = property(lambda self: self._puzzle[0])
     height = property(lambda self: self._puzzle[1])
-    pieces = property(lambda self: self._puzzle[2:])
+
+    @property
+    def pieces(self) -> Tuple[BaseOrientedPiece, ...]:
+        return self._puzzle[2:]
 
     def __repr__(self) -> str:
         bits = []
-        all_empty = all(piece is EmptySpot for piece in self.pieces)
+        all_empty = all(piece.is_empty for piece in self.pieces)
         if self.width != 0 or self.height != 0 or not all_empty:
             bits.extend([str(self.width), str(self.height)])
         if not all_empty:
@@ -638,16 +701,24 @@ class Puzzle:
     def __hash__(self) -> int:
         return hash(self._puzzle)
 
-    def get(self, col: int, row: int) -> Union[OrientedPiece, Type[EmptySpot]]:
+    def get(self, col: int, row: int) -> BaseOrientedPiece:
+        """Get the piece / EmptySpot, or an EmptySpot if out of range."""
         if col < 0 or row < 0 or col >= self.width or row >= self.height:
-            return EmptySpot
-        return cast(
-            Union[OrientedPiece, Type[EmptySpot]], self.pieces[(self.width * row) + col]
-        )
+            return EmptySpot()
+        return cast(BaseOrientedPiece, self.pieces[(self.width * row) + col])
+
+    def get_neighbors(self, col: int, row: int) -> Dict[Edge, BaseOrientedPiece]:
+        """Get the surrounding neighbors, which may be EmptySpots."""
+        return {
+            Edge.NORTH: self.get(col, row - 1),
+            Edge.EAST: self.get(col + 1, row),
+            Edge.SOUTH: self.get(col, row + 1),
+            Edge.WEST: self.get(col - 1, row),
+        }
 
     def __str__(self) -> str:
         """Draw the puzzle with unicode rank and box characters."""
-        empty = all(p is EmptySpot for p in self.pieces)
+        empty = all(p.is_empty for p in self.pieces)
         if empty:
             return f"(Empty {self.width}x{self.height} Puzzle)"
 
@@ -657,41 +728,37 @@ class Puzzle:
         for piece in self.pieces:
 
             # Check if surrounding spots are empty or pieces
-            above: Union[OrientedPiece, Type[EmptySpot]] = EmptySpot
-            if row != 0:
-                above = self.get(col, row - 1)
-            above_empty = above is EmptySpot
-
-            left: Union[OrientedPiece, Type[EmptySpot]] = EmptySpot
-            if col != 0:
-                left = self.get(col - 1, row)
-            left_empty = left is EmptySpot
+            neighbors = self.get_neighbors(col, row)
+            above = neighbors[Edge.NORTH]
+            left = neighbors[Edge.WEST]
 
             is_last_row = row == (self.width - 1)
             is_last_col = col == (self.height - 1)
 
-            is_empty = piece is EmptySpot
-            if is_empty:
-                if above_empty:
+            if piece.is_empty:
+                if above.is_empty:
                     n_char = " "
                 else:
                     n_char = PIPS[cast(OrientedPiece, above).south]
-                if left_empty:
+                if left.is_empty:
                     w_char = " "
                 else:
                     w_char = PIPS[cast(OrientedPiece, left).east]
                 center_char = " "
             else:
-                n_shape, n_end = piece.north
-                if not above_empty:
+                n_shape, n_end = cast(OrientedPiece, piece).north
+                if not above.is_empty:
                     n_end = End.TAB
                 n_char = PIPS[(n_shape, n_end)]
 
-                w_shape, w_end = piece.west
-                if not left_empty:
+                w_shape, w_end = cast(OrientedPiece, piece).west
+                if not left.is_empty:
                     w_end = End.TAB
                 w_char = PIPS[(w_shape, w_end)]
-                center_char = "R" if piece.side == Side.RED else "B"
+
+                center_char = (
+                    "R" if cast(OrientedPiece, piece).side == Side.RED else "B"
+                )
 
             nw_char = {
                 (False, False, False): "┼",
@@ -703,7 +770,7 @@ class Puzzle:
                 (True, True, False): "┐",
                 (True, True, True): " ",
             }
-            top.append(nw_char[(is_empty, above_empty, left_empty)])
+            top.append(nw_char[(piece.is_empty, above.is_empty, left.is_empty)])
             top.append(n_char)
             middle.append(w_char)
             middle.append(center_char)
@@ -718,11 +785,11 @@ class Puzzle:
                     (True, False): "┘",
                     (True, True): " ",
                 }
-                top.append(ne_char[(is_empty, above_empty)])
-                if is_empty:
+                top.append(ne_char[(piece.is_empty, above.is_empty)])
+                if piece.is_empty:
                     middle.append(" ")
                 else:
-                    middle.append(PIPS[piece.east])
+                    middle.append(PIPS[cast(OrientedPiece, piece).east])
 
             if is_last_row:
                 # Draw the bottom edge
@@ -734,15 +801,15 @@ class Puzzle:
                     (True, False): "┘",
                     (True, True): " ",
                 }
-                bottom.append(sw_char[(is_empty, left_empty)])
-                if is_empty:
+                bottom.append(sw_char[(piece.is_empty, left.is_empty)])
+                if piece.is_empty:
                     bottom.append(" ")
                 else:
-                    bottom.append(PIPS[piece.south])
+                    bottom.append(PIPS[cast(OrientedPiece, piece).south])
 
                 if is_last_col:
                     # Draw the bottom right corner
-                    if is_empty:
+                    if piece.is_empty:
                         bottom.append(" ")
                     else:
                         bottom.append("┘")
@@ -767,11 +834,11 @@ class Puzzle:
         """Return puzzles where this piece fits at the given spot."""
 
         for oriented_piece in self.pieces:
-            if oriented_piece is not EmptySpot and oriented_piece.piece is piece:
+            if oriented_piece.piece is piece:
                 # Can't add piece twice
                 return set()
 
-        if self.get(at_column, at_row) is not EmptySpot:
+        if not self.get(at_column, at_row).is_empty:
             # Can't add to the same spot twice
             return set()
 
@@ -784,7 +851,7 @@ class Puzzle:
             puzzle = Puzzle(new_width, new_height)
             for col, row in product(range(new_width), range(new_height)):
                 old_piece = self.get(col, row)
-                if old_piece is not EmptySpot:
+                if not old_piece.is_empty:
                     puzzle = puzzle.place_at(cast(OrientedPiece, old_piece), col, row)
 
         puzzles = set()
@@ -808,27 +875,8 @@ class Puzzle:
         ):
             raise NotImplementedError("Resizing not implemented")
 
-        if self.get(at_column, at_row) is not EmptySpot:
+        if not self.get(at_column, at_row).is_empty:
             raise ValueError("There is already a piece there.")
-
-        # Test against surrounding pieces
-        top = self.get(at_column, at_row - 1)
-        if top is not EmptySpot and not piece.fits_below(cast(OrientedPiece, top)):
-            raise ValueError("Does not fit with piece above")
-
-        right = self.get(at_column + 1, at_row)
-        if right is not EmptySpot and not piece.fits_left(cast(OrientedPiece, right)):
-            raise ValueError("Does not fit with piece to right")
-
-        bottom = self.get(at_column, at_row + 1)
-        if bottom is not EmptySpot and not piece.fits_above(
-            cast(OrientedPiece, bottom)
-        ):
-            raise ValueError("Does not fit with piece below")
-
-        left = self.get(at_column - 1, at_row)
-        if left is not EmptySpot and not piece.fits_right(cast(OrientedPiece, left)):
-            raise ValueError("Does not fit with piece to left")
 
         pieces = list(self.pieces)
         pieces[at_column + at_row * self.width] = piece
@@ -840,7 +888,6 @@ def solve_puzzle_with_details(
 ) -> Dict[int, Set[Puzzle]]:
     assert rows * columns == len(pieces)
 
-    # puzzles_by_size: Dict[int, Set[Puzzle]] = {0: {Puzzle()}}
     puzzles_by_size = {0: {Puzzle()}}
     for size in range(1, (rows * columns) + 1):
         # Determine the rows and columns for this attempt
@@ -850,7 +897,8 @@ def solve_puzzle_with_details(
         height = at_row + 1
         if verbose:
             print(
-                f"Looking for solutions for {size}-piece puzzle at {at_col}x{at_row} in {width}x{height} Puzzle"
+                f"Looking for solutions for {size}-piece puzzle"
+                f" at {at_col}x{at_row} in {width}x{height} Puzzle"
             )
 
         last_puzzles = puzzles_by_size[size - 1]

@@ -5,17 +5,18 @@ from typing import Tuple
 import pytest
 
 from puzzle import (
+    Edge,
+    EmptySpot,
     End,
     Orientation,
     OrientedPiece,
     Piece,
+    Puzzle,
     Row,
     RowPair,
     Shape,
     Side,
     Turn,
-    Puzzle,
-    EmptySpot,
     solve_puzzle,
 )
 
@@ -253,7 +254,7 @@ def piece2(otp_pieces: Tuple[Piece, ...]) -> Piece:
 
 @pytest.fixture
 def piece3(otp_pieces: Tuple[Piece, ...]) -> Piece:
-    return otp_pieces[2]
+    return otp_pieces[2]  # Red-♥♦♢♡
 
 
 @pytest.fixture
@@ -340,6 +341,8 @@ class TestOrientedPiece:
             "OrientedPiece(Piece("
             "Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND))"
         )
+        assert op.is_empty is False
+
         assert op.side == Side.RED
 
         assert op.north == (Shape.SPADE, End.TAB)
@@ -533,11 +536,46 @@ class TestOrientedPiece:
         assert str(op1) == "Red-♠♦♡♢"
         assert op9.fits_below(op1) is fits
 
+    def test_fits_neighbors(
+        self, piece1: Piece, piece2: Piece, piece3: Piece, piece4: Piece
+    ) -> None:
+        op1 = OrientedPiece(piece1)
+        neighbors = {
+            Edge.NORTH: OrientedPiece(piece2),
+            Edge.SOUTH: OrientedPiece(piece3),
+            Edge.EAST: OrientedPiece(piece4),
+            Edge.WEST: EmptySpot(),
+        }
+        fits = op1.fits_neighbors(neighbors)
+        assert fits == {
+            Edge.NORTH: True,
+            Edge.SOUTH: True,
+            Edge.EAST: True,
+            Edge.WEST: True,
+        }
+        assert op1.fits_all_neighbors(neighbors)
+
+        neighbors = {
+            Edge.NORTH: EmptySpot(),
+            Edge.SOUTH: OrientedPiece(piece2),
+            Edge.EAST: OrientedPiece(piece3),
+            Edge.WEST: OrientedPiece(piece4),
+        }
+        fits = op1.fits_neighbors(neighbors)
+        assert fits == {
+            Edge.NORTH: True,
+            Edge.SOUTH: False,
+            Edge.EAST: False,
+            Edge.WEST: False,
+        }
+        assert not op1.fits_all_neighbors(neighbors)
+
 
 class TestEmptySpot:
     def test_init(self) -> None:
         es = EmptySpot()
         assert repr(es) == "EmptySpot()"
+        assert es.is_empty is True
 
     def test_equality(self, piece1: Piece) -> None:
         eq1 = EmptySpot()
@@ -563,6 +601,23 @@ class TestEmptySpot:
         assert piece1.fits_left(eq1)
         assert piece1.fits_above(eq1)
         assert piece1.fits_below(eq1)
+
+    def test_fits_neighbors(self, piece2: Piece, piece3: Piece, piece4: Piece) -> None:
+        op1 = EmptySpot()
+        neighbors = {
+            Edge.NORTH: OrientedPiece(piece2),
+            Edge.SOUTH: OrientedPiece(piece3),
+            Edge.EAST: OrientedPiece(piece4),
+            Edge.WEST: EmptySpot(),
+        }
+        fits = op1.fits_neighbors(neighbors)
+        assert fits == {
+            Edge.NORTH: True,
+            Edge.SOUTH: True,
+            Edge.EAST: True,
+            Edge.WEST: True,
+        }
+        assert op1.fits_all_neighbors(neighbors)
 
 
 class TestRowPair:
@@ -634,8 +689,8 @@ class TestPuzzle:
         puzzle = Puzzle()
         assert puzzle.width == 0
         assert puzzle.height == 0
-        assert puzzle.pieces == ()
-        assert puzzle.get(0, 0) is EmptySpot
+        assert len(puzzle.pieces) == 0
+        assert isinstance(puzzle.get(0, 0), EmptySpot)
         assert str(puzzle) == "(Empty 0x0 Puzzle)"
         assert repr(puzzle) == "Puzzle()"
 
@@ -643,18 +698,18 @@ class TestPuzzle:
         puzzle = Puzzle(1, 1)
         assert puzzle.width == 1
         assert puzzle.height == 1
-        assert puzzle.pieces == (EmptySpot,)
-        assert puzzle.get(0, 0) is EmptySpot
+        assert len(puzzle.pieces) == 1
+        assert isinstance(puzzle.pieces[0], EmptySpot)
+        assert isinstance(puzzle.get(0, 0), EmptySpot)
         assert str(puzzle) == "(Empty 1x1 Puzzle)"
         assert repr(puzzle) == "Puzzle(1, 1)"
 
-    def test_init_piece(self) -> None:
-        piece = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
-        op = OrientedPiece(piece)
-        puzzle = Puzzle(1, 1, (op,))
+    def test_init_piece(self, piece3: Piece) -> None:
+        op3 = OrientedPiece(piece3)
+        puzzle = Puzzle(1, 1, (op3,))
         assert puzzle.width == 1
         assert puzzle.height == 1
-        assert puzzle.pieces == (op,)
+        assert puzzle.pieces == (op3,)
         assert (
             str(puzzle)
             == """\
@@ -662,24 +717,21 @@ class TestPuzzle:
 ♡R♦
 └♢┘"""
         )
-        assert (
-            repr(puzzle)
-            == "Puzzle(1, 1, (OrientedPiece(Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)),))"
-        )
+        assert repr(puzzle) == f"Puzzle(1, 1, (OrientedPiece({piece3!r}),))"
 
-    def test_init_missing_piece(self) -> None:
-        op1 = OrientedPiece(
-            Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
-        )
-        op2 = OrientedPiece(
-            Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
-        )
-        op3 = OrientedPiece(Piece(Shape.DIAMOND, Shape.CLUB, Shape.CLUB, Shape.DIAMOND))
+    def test_init_missing_piece(
+        self, piece3: Piece, piece1: Piece, piece4: Piece
+    ) -> None:
+        op3 = OrientedPiece(piece3)
+        op1 = OrientedPiece(piece1)
+        op4 = OrientedPiece(piece4)
+        puzzle = Puzzle(2, 2, (op3, op1, op4))
 
-        puzzle = Puzzle(2, 2, (op1, op2, op3))
         assert puzzle.width == 2
         assert puzzle.height == 2
-        assert puzzle.pieces == (op1, op2, op3, EmptySpot)
+        assert len(puzzle.pieces) == 4
+        assert puzzle.pieces[:3] == (op3, op1, op4)
+        assert puzzle.pieces[3].is_empty
         expected = """\
 ┌♥┬♠┐
 ♡R♦R♦
@@ -689,24 +741,61 @@ class TestPuzzle:
         assert str(puzzle) == expected
 
     def test_init_fails_negative_width(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as err:
             Puzzle(-1, 0)
+        assert str(err.value) == "Negative width is not allowed"
 
     def test_init_fails_negative_height(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as err:
             Puzzle(0, -1)
+        assert str(err.value) == "Negative height is not allowed"
 
     def test_init_fails_only_width_zero(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as err:
             Puzzle(0, 1)
+        assert str(err.value) == "width must be positive since height is positive"
 
     def test_init_fails_only_height_zero(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as err:
             Puzzle(1, 0)
+        assert str(err.value) == "height must be positive since width is positive"
 
     def test_init_fails_too_many_pieces(self, piece1: Piece, piece2: Piece) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError) as err:
             Puzzle(1, 1, (OrientedPiece(piece1), OrientedPiece(piece2)))
+        assert (
+            str(err.value)
+            == "2 pieces will not fit in a puzzle of size 1 (width 1, height 1)"
+        )
+
+    def test_init_fails_pieces_do_not_fit(self, piece1: Piece, piece2: Piece) -> None:
+        with pytest.raises(ValueError) as err:
+            Puzzle(2, 1, (OrientedPiece(piece1), OrientedPiece(piece2)))
+        assert str(err.value) == (
+            "Piece Red-♠♦♡♢ does not fit at col 0, row 0: Edge.EAST is Red-♣♥♤♡"
+        )
+
+    def test_get_neighbors(self, piece3: Piece, piece1: Piece, piece4: Piece) -> None:
+        op3 = OrientedPiece(piece3)
+        op1 = OrientedPiece(piece1)
+        op4 = OrientedPiece(piece4)
+        puzzle = Puzzle(2, 2, (op3, op1, op4))
+
+        piece = puzzle.get(0, 0)
+        assert piece == op3
+        neighbors = puzzle.get_neighbors(0, 0)
+        assert neighbors[Edge.NORTH].is_empty
+        assert neighbors[Edge.SOUTH] == op4
+        assert neighbors[Edge.WEST].is_empty
+        assert neighbors[Edge.EAST] == op1
+
+        piece = puzzle.get(1, 1)
+        assert piece.is_empty
+        neighbors = puzzle.get_neighbors(1, 1)
+        assert neighbors[Edge.NORTH] == op1
+        assert neighbors[Edge.SOUTH].is_empty
+        assert neighbors[Edge.WEST] == op4
+        assert neighbors[Edge.EAST].is_empty
 
 
 class TestSolvePuzzle:
@@ -715,20 +804,20 @@ class TestSolvePuzzle:
         assert str(piece4) == "Red-♦♣♧♢"
         assert str(piece9) == "Red-♥♠♤♧"
         expected_orientations = [
-            (piece4, True, Turn.NO_TURN, piece9, True, Turn.NO_TURN),
-            (piece9, False, Turn.NO_TURN, piece4, False, Turn.NO_TURN),
-            (piece9, False, Turn.NO_TURN, piece4, True, Turn.TURN_180),
-            (piece4, False, Turn.TURN_180, piece9, False, Turn.TURN_180),
-            (piece4, False, Turn.TURN_180, piece9, True, Turn.NO_TURN),
-            (piece4, True, Turn.NO_TURN, piece9, False, Turn.TURN_180),
-            (piece9, True, Turn.TURN_180, piece4, False, Turn.NO_TURN),
-            (piece9, True, Turn.TURN_180, piece4, True, Turn.TURN_180),
+            (piece4, False, Turn.NO_TURN, piece9, False, Turn.NO_TURN),
+            (piece4, False, Turn.NO_TURN, piece9, True, Turn.TURN_180),
+            (piece9, False, Turn.TURN_180, piece4, False, Turn.TURN_180),
+            (piece9, False, Turn.TURN_180, piece4, True, Turn.NO_TURN),
+            (piece9, True, Turn.NO_TURN, piece4, False, Turn.TURN_180),
+            (piece9, True, Turn.NO_TURN, piece4, True, Turn.NO_TURN),
+            (piece4, True, Turn.TURN_180, piece9, False, Turn.NO_TURN),
+            (piece4, True, Turn.TURN_180, piece9, True, Turn.TURN_180),
         ]
         expected = [
             Puzzle(2, 1, (OrientedPiece(p1, f1, t1), OrientedPiece(p2, f2, t2)))
             for p1, f1, t1, p2, f2, t2 in expected_orientations
         ]
-        # assert sorted(expected) == expected
+        assert sorted(expected) == expected
         puzzles = solve_puzzle(2, 1, (piece4, piece9))
         assert puzzles == set(expected)
         '''
@@ -737,7 +826,7 @@ class TestSolvePuzzle:
 ♢R♣R♠
 └♧┴♤┘
 """
-        '''
+'''
 
     def test_fit_top_bottom(self, piece4: Piece, piece9: Piece) -> None:
         """A piece with one possible matching side fits 8 ways."""
@@ -759,8 +848,8 @@ class TestSolvePuzzle:
         ]
         assert sorted(expected) == expected
         puzzles = solve_puzzle(1, 2, (piece4, piece9))
-        '''
         assert puzzles == set(expected)
+        '''
         assert str(expected[0]) == """\
 ┌♠┐
 ♥R♤
