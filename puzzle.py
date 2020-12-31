@@ -732,8 +732,8 @@ class Puzzle:
             above = neighbors[Edge.NORTH]
             left = neighbors[Edge.WEST]
 
-            is_last_row = row == (self.width - 1)
-            is_last_col = col == (self.height - 1)
+            is_last_row = row == (self.height - 1)
+            is_last_col = col == (self.width - 1)
 
             if piece.is_empty:
                 if above.is_empty:

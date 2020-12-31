@@ -740,6 +740,21 @@ class TestPuzzle:
 └♧┘  """
         assert str(puzzle) == expected
 
+    def test_init_row_pair(self, piece1: Piece, piece3: Piece) -> None:
+        op1 = OrientedPiece(piece1)
+        op3 = OrientedPiece(piece3)
+        assert str(op1) == "Red-♠♦♡♢"
+        assert str(op3) == "Red-♥♦♢♡"
+        puzzle = Puzzle(2, 1, (op3, op1))
+        assert (
+            str(puzzle)
+            == """\
+┌♥┬♠┐
+♡R♦R♦
+└♢┴♡┘\
+"""
+        )
+
     def test_init_fails_negative_width(self) -> None:
         with pytest.raises(ValueError) as err:
             Puzzle(-1, 0)
@@ -820,13 +835,14 @@ class TestSolvePuzzle:
         assert sorted(expected) == expected
         puzzles = solve_puzzle(2, 1, (piece4, piece9))
         assert puzzles == set(expected)
-        '''
-        assert str(expected[0]) == """\
+        assert (
+            str(expected[0])
+            == """\
 ┌♦┬♥┐
 ♢R♣R♠
-└♧┴♤┘
+└♧┴♤┘\
 """
-'''
+        )
 
     def test_fit_top_bottom(self, piece4: Piece, piece9: Piece) -> None:
         """A piece with one possible matching side fits 8 ways."""
@@ -849,15 +865,16 @@ class TestSolvePuzzle:
         assert sorted(expected) == expected
         puzzles = solve_puzzle(1, 2, (piece4, piece9))
         assert puzzles == set(expected)
-        '''
-        assert str(expected[0]) == """\
+        assert (
+            str(expected[0])
+            == """\
 ┌♠┐
 ♥R♤
 ├♣┤
 ♦R♧
-└♢┘
+└♢┘\
 """
-'''
+        )
 
     def test_no_fit_self(self, piece4: Piece) -> None:
         """A piece doesn't fit itself."""
