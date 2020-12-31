@@ -4,7 +4,7 @@
 from enum import Enum, IntEnum
 from functools import total_ordering
 from itertools import product
-from typing import ClassVar, Dict, Tuple, Set, Union, Type, Sequence, cast
+from typing import ClassVar, Dict, Tuple, Set, Union, Type, Sequence, Any, cast
 from math import floor
 
 
@@ -99,6 +99,7 @@ class Orientation:
         south_end: End,
         west_shape: Shape,
         west_end: End,
+        **params: Any,
     ):
         """Initialize an orientation of a puzzle piece."""
         self._attributes = (
@@ -106,6 +107,7 @@ class Orientation:
             (north_end, east_end, south_end, west_end),
             (north_shape, east_shape, south_shape, west_shape),
         )
+        super().__init__()
 
     @property
     def side(self) -> Side:
@@ -242,6 +244,30 @@ class Orientation:
             new_side, *new_edges[0], *new_edges[1], *new_edges[2], *new_edges[3]
         )
 
+    def fits_right(self, other: object) -> bool:
+        if not isinstance(other, Orientation):
+            return NotImplemented
+        return bool(
+            (self.east_shape == other.west_shape) and (self.east_end != other.west_end)
+        )
+
+    def fits_left(self, other: "Orientation") -> bool:
+        return bool(
+            (self.west_shape == other.east_shape) and (self.west_end != other.east_end)
+        )
+
+    def fits_below(self, other: "Orientation") -> bool:
+        return bool(
+            (self.south_shape == other.north_shape)
+            and (self.south_end != other.north_end)
+        )
+
+    def fits_above(self, other: "Orientation") -> bool:
+        return bool(
+            (self.north_shape == other.south_shape)
+            and (self.north_end != other.south_end)
+        )
+
 
 class Piece(Orientation):
     """A puzzle piece."""
@@ -276,15 +302,15 @@ class Piece(Orientation):
             west_end,
         ).to_standard()
         super().__init__(
-            std.side,
-            std.north_shape,
-            std.north_end,
-            std.east_shape,
-            std.east_end,
-            std.south_shape,
-            std.south_end,
-            std.west_shape,
-            std.west_end,
+            side=std.side,
+            north_shape=std.north_shape,
+            north_end=std.north_end,
+            east_shape=std.east_shape,
+            east_end=std.east_end,
+            south_shape=std.south_shape,
+            south_end=std.south_end,
+            west_shape=std.west_shape,
+            west_end=std.west_end,
         )
 
     def __eq__(self, other: object) -> bool:
@@ -305,8 +331,75 @@ class Piece(Orientation):
         """Use defaults for repr"""
         return f"{self.__class__.__name__}({', '.join(str(s) for s in self.shapes)})"
 
+    def fits_right(self, other: object) -> bool:
+        if not isinstance(other, Piece):
+            return NotImplemented
+        return (self is not other) and super().fits_right(other)
 
-class OrientedPiece(Orientation):
+    def fits_left(self, other: object) -> bool:
+        if not isinstance(other, Piece):
+            return NotImplemented
+        return (self is not other) and super().fits_left(other)
+
+    def fits_below(self, other: object) -> bool:
+        if not isinstance(other, Piece):
+            return NotImplemented
+        return (self is not other) and super().fits_below(other)
+
+    def fits_above(self, other: object) -> bool:
+        if not isinstance(other, Piece):
+            return NotImplemented
+        return (self is not other) and super().fits_above(other)
+
+
+class BaseOrientedPiece:
+    def __init__(self, piece: Union[Piece, None], **params: Any):
+        self.piece = piece
+        super().__init__(**params)  # type: ignore
+
+    def __ne__(self, other: object) -> bool:
+        return not self == other
+
+
+class EmptySpot(BaseOrientedPiece):
+    """An empty spot in the puzzle."""
+
+    def __init__(self) -> None:
+        super().__init__(piece=None)
+
+    def __repr__(self) -> str:
+        return "EmptySpot()"
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, BaseOrientedPiece):
+            return NotImplemented
+        return False
+
+    def __hash__(self) -> int:
+        return hash((None,))
+
+    def fits_right(self, other: object) -> bool:
+        if not isinstance(other, BaseOrientedPiece):
+            return NotImplemented
+        return True
+
+    def fits_left(self, other: object) -> bool:
+        if not isinstance(other, BaseOrientedPiece):
+            return NotImplemented
+        return True
+
+    def fits_below(self, other: object) -> bool:
+        if not isinstance(other, BaseOrientedPiece):
+            return NotImplemented
+        return True
+
+    def fits_above(self, other: object) -> bool:
+        if not isinstance(other, BaseOrientedPiece):
+            return NotImplemented
+        return True
+
+
+class OrientedPiece(BaseOrientedPiece, Orientation):
     """A puzzle piece in a particular orientation."""
 
     def __init__(self, piece: Piece, flip: bool = False, turn: Turn = Turn.NO_TURN):
@@ -315,15 +408,16 @@ class OrientedPiece(Orientation):
         self.turn = turn
         orientation = piece.reorient(flip=flip, turn=turn)
         super().__init__(
-            orientation.side,
-            orientation.north_shape,
-            orientation.north_end,
-            orientation.east_shape,
-            orientation.east_end,
-            orientation.south_shape,
-            orientation.south_end,
-            orientation.west_shape,
-            orientation.west_end,
+            piece=piece,
+            side=orientation.side,
+            north_shape=orientation.north_shape,
+            north_end=orientation.north_end,
+            east_shape=orientation.east_shape,
+            east_end=orientation.east_end,
+            south_shape=orientation.south_shape,
+            south_end=orientation.south_end,
+            west_shape=orientation.west_shape,
+            west_end=orientation.west_end,
         )
 
     def __repr__(self) -> str:
@@ -335,46 +429,48 @@ class OrientedPiece(Orientation):
 
         return f"OrientedPiece({', '.join(p for p in parts)})"
 
+    def __hash__(self) -> int:
+        return hash((self.piece, self.flip, self.turn))
+
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, OrientedPiece):
+        if not isinstance(other, BaseOrientedPiece):
             return NotImplemented
+        if self.piece is None or other.piece is None:
+            return False
+        other = cast(OrientedPiece, other)
         return (
             (self.piece is other.piece)
             and (self.flip == other.flip)
             and (self.turn == other.turn)
         )
 
-    def __ne__(self, other: object) -> bool:
-        if not isinstance(other, OrientedPiece):
+    def fits_right(self, other: object) -> bool:
+        if not isinstance(other, BaseOrientedPiece):
             return NotImplemented
-        return (
-            (self.piece is not other.piece)
-            or (self.flip != other.flip)
-            or (self.turn != other.turn)
-        )
+        if other.piece is None:
+            return True
+        return super().fits_right(cast(OrientedPiece, other))
 
-    def __hash__(self) -> int:
-        return hash((self.piece, self.flip, self.turn))
+    def fits_left(self, other: object) -> bool:
+        if not isinstance(other, BaseOrientedPiece):
+            return NotImplemented
+        if other.piece is None:
+            return True
+        return super().fits_left(cast(OrientedPiece, other))
 
-    def fits_right(self, other: "OrientedPiece") -> bool:
-        return (
-            (self.piece is not other.piece)
-            and (self.east_shape == other.west_shape)
-            and (self.east_end != other.west_end)
-        )
+    def fits_below(self, other: object) -> bool:
+        if not isinstance(other, BaseOrientedPiece):
+            return NotImplemented
+        if other.piece is None:
+            return True
+        return super().fits_below(cast(OrientedPiece, other))
 
-    def fits_left(self, other: "OrientedPiece") -> bool:
-        return other.fits_right(self)
-
-    def fits_below(self, other: "OrientedPiece") -> bool:
-        return (
-            (self.piece is not other.piece)
-            and (self.north_shape == other.south_shape)
-            and (self.north_end != other.south_end)
-        )
-
-    def fits_above(self, other: "OrientedPiece") -> bool:
-        return other.fits_below(self)
+    def fits_above(self, other: object) -> bool:
+        if not isinstance(other, BaseOrientedPiece):
+            return NotImplemented
+        if other.piece is None:
+            return True
+        return super().fits_above(cast(OrientedPiece, other))
 
 
 class RowPair:
@@ -474,10 +570,6 @@ class Row:
         return hash(self._row)
 
 
-class EmptySpot:
-    """A blank spot in a puzzle"""
-
-
 class Puzzle:
     """A collection of OrientedPieces and EmptySpots that fit."""
 
@@ -487,14 +579,25 @@ class Puzzle:
         height: int = 0,
         pieces: Union[None, Tuple[Union[OrientedPiece, Type[EmptySpot]], ...]] = None,
     ):
-        if width or height:
-            width = max(1, width)
-            height = max(1, height)
+        if width < 0:
+            raise ValueError("negative width is not allowed")
+        if height < 0:
+            raise ValueError("negative height is not allowed")
+        if width == 0 and height > 0:
+            raise ValueError("width must be positive since height is positive")
+        if height == 0 and width > 0:
+            raise ValueError("height must be positive since width is positive")
+
         if pieces is None:
             pieces = ()
-        assert (width * height) >= len(pieces)
+        if len(pieces) > (width * height):
+            raise ValueError(
+                f"{len(pieces)} will not fit in a puzzle of width {width}, height {height}"
+            )
+        # Fill out empty spaces
         if (width * height) > len(pieces):
             pieces += (EmptySpot,) * ((width * height) - len(pieces))
+
         self._puzzle = (width, height) + pieces
 
     width = property(lambda self: self._puzzle[0])
@@ -539,7 +642,7 @@ class Puzzle:
         if col < 0 or row < 0 or col >= self.width or row >= self.height:
             return EmptySpot
         return cast(
-            Union[OrientedPiece, Type[EmptySpot]], self.pieces[self.width * row + col]
+            Union[OrientedPiece, Type[EmptySpot]], self.pieces[(self.width * row) + col]
         )
 
     def __str__(self) -> str:
