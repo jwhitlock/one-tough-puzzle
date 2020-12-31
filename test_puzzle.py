@@ -12,8 +12,6 @@ from puzzle import (
     OrientedPiece,
     Piece,
     Puzzle,
-    Row,
-    RowPair,
     Shape,
     Side,
     Turn,
@@ -618,70 +616,6 @@ class TestEmptySpot:
             Edge.WEST: True,
         }
         assert op1.fits_all_neighbors(neighbors)
-
-
-class TestRowPair:
-    def test_init(self) -> None:
-        piece1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)  # 3
-        piece2 = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)  # 1
-        op1 = OrientedPiece(piece1)
-        op2 = OrientedPiece(piece2)
-        rp = RowPair(op1, op2)
-
-        assert str(rp) == "Red-♥♦♢♡ → Red-♠♦♡♢"
-        assert repr(rp) == (
-            "RowPair(OrientedPiece(Piece("
-            "Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)),"
-            " OrientedPiece(Piece("
-            "Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)))"
-        )
-
-    def test_rows_with(self) -> None:
-        piece1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)  # 3
-        piece2 = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)  # 1
-        op1 = OrientedPiece(piece1)
-        op2 = OrientedPiece(piece2)
-        rp = RowPair(op1, op2)
-
-        # Can not make a row with a piece in the pair
-        assert rp.rows_with(piece1) == set()
-        assert rp.rows_with(piece2) == set()
-
-        piece3 = Piece(Shape.SPADE, Shape.SPADE, Shape.HEART, Shape.CLUB)
-        assert rp.rows_with(piece3) == set()
-
-        piece4 = Piece(Shape.DIAMOND, Shape.CLUB, Shape.CLUB, Shape.DIAMOND)
-        expected = [
-            Row(
-                OrientedPiece(piece1),
-                OrientedPiece(piece2),
-                OrientedPiece(piece4),
-            ),
-            Row(
-                OrientedPiece(piece1),
-                OrientedPiece(piece2),
-                OrientedPiece(piece4, flip=True, turn=Turn.TURN_180),
-            ),
-        ]
-        assert sorted(expected) == expected
-        assert rp.rows_with(piece4) == set(expected)
-
-
-class TestRow:
-    def test_init(self) -> None:
-        piece1 = Piece(Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)
-        piece2 = Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)
-        piece3 = Piece(Shape.SPADE, Shape.SPADE, Shape.HEART, Shape.CLUB)
-        row = Row(OrientedPiece(piece1), OrientedPiece(piece2), OrientedPiece(piece3))
-        assert str(row) == "Red-♥♦♢♡ → Red-♠♦♡♢ → Red-♠♠♡♧"
-        assert repr(row) == (
-            "Row(OrientedPiece(Piece("
-            "Shape.HEART, Shape.DIAMOND, Shape.DIAMOND, Shape.HEART)),"
-            " OrientedPiece(Piece("
-            "Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND)),"
-            " OrientedPiece(Piece("
-            "Shape.SPADE, Shape.SPADE, Shape.HEART, Shape.CLUB)))"
-        )
 
 
 class TestPuzzle:
