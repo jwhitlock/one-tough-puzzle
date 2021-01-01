@@ -518,6 +518,14 @@ class OrientedPiece(BaseOrientedPiece, Orientation):
             return True
         return super().fits_above(cast(OrientedPiece, other))
 
+    @property
+    def is_red(self) -> bool:
+        return not self.flip
+
+    @property
+    def is_standard(self) -> bool:
+        return self.turn == Turn.NO_TURN and not self.flip
+
 
 class Puzzle:
     """A collection of OrientedPieces and EmptySpots that fit."""
@@ -603,6 +611,22 @@ class Puzzle:
 
     def __hash__(self) -> int:
         return hash(self._puzzle)
+
+    @property
+    def is_red(self) -> bool:
+        for piece in self.pieces:
+            if not piece.is_empty and cast(OrientedPiece, piece).flip:
+                return False
+        return True
+
+    @property
+    def is_standard(self) -> bool:
+        for piece in self.pieces:
+            if not piece.is_empty:
+                piece = cast(OrientedPiece, piece)
+                if piece.flip or piece.turn != Turn.NO_TURN:
+                    return False
+        return True
 
     def get(self, col: int, row: int) -> BaseOrientedPiece:
         """Get the piece / EmptySpot, or an EmptySpot if out of range."""
@@ -796,7 +820,7 @@ def solve_puzzle_with_details(
         # Determine the rows and columns for this attempt
         at_col = (size - 1) % columns
         at_row = int(floor((size - 1) / columns))
-        width = min(size, at_col + 1)
+        width = min(size, columns)
         height = at_row + 1
         if verbose:
             print(
@@ -810,7 +834,7 @@ def solve_puzzle_with_details(
             for piece in pieces:
                 next_puzzles |= puzzle.fit_at(piece, at_col, at_row)
         if verbose:
-            print(f"Found {len(next_puzzles)} {size}-piece puzzles. First 3:")
+            print(f"Found {len(next_puzzles):,} {size}-piece puzzles. First 3:")
             for puzzle in sorted(next_puzzles)[:3]:
                 print(puzzle)
                 print()
@@ -847,4 +871,22 @@ if __name__ == "__main__":
     possibilities = 8 ** len(pieces)
     print(f"{possibilities:,} possible combinations\n")
 
-    puzzles_by_size = solve_puzzle(3, 3, pieces, verbose=True)
+    puzzles = solve_puzzle(3, 3, pieces, verbose=True)
+
+    standard: Set[Puzzle] = set()
+    red: Set[Puzzle] = set()
+    for puzzle in puzzles:
+        if puzzle.is_standard:
+            standard.add(puzzle)
+        if puzzle.is_red:
+            red.add(puzzle)
+
+    print(f"{len(red):,} all-red puzzles:")
+    for puzzle in sorted(red):
+        print(puzzle)
+        print()
+
+    print(f"{len(standard):,} standard orientation puzzles")
+    for puzzle in sorted(standard)[:3]:
+        print(puzzle)
+        print()

@@ -340,6 +340,8 @@ class TestOrientedPiece:
             "Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND))"
         )
         assert op.is_empty is False
+        assert op.is_red is True
+        assert op.is_standard is True
 
         assert op.side == Side.RED
 
@@ -367,6 +369,9 @@ class TestOrientedPiece:
             "Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND),"
             " flip=True)"
         )
+        assert op.is_empty is False
+        assert op.is_red is False
+        assert op.is_standard is False
 
     def test_turned_init(self, piece1: Piece) -> None:
         """A piece can be turned at init."""
@@ -377,6 +382,9 @@ class TestOrientedPiece:
             "Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND),"
             " turn=Turn.TURN_90)"
         )
+        assert op.is_empty is False
+        assert op.is_red is True
+        assert op.is_standard is False
 
     def test_full_init(self, piece1: Piece) -> None:
         """A piece can be flipped and turned at init."""
@@ -387,6 +395,9 @@ class TestOrientedPiece:
             "Piece(Shape.SPADE, Shape.DIAMOND, Shape.HEART, Shape.DIAMOND),"
             " flip=True, turn=Turn.TURN_90)"
         )
+        assert op.is_empty is False
+        assert op.is_red is False
+        assert op.is_standard is False
 
     def test_equality(self, piece1: Piece, piece4: Piece) -> None:
         """An OrientedPiece is equal when the same piece and orientation."""
@@ -627,6 +638,8 @@ class TestPuzzle:
         assert isinstance(puzzle.get(0, 0), EmptySpot)
         assert str(puzzle) == "(Empty 0x0 Puzzle)"
         assert repr(puzzle) == "Puzzle()"
+        assert puzzle.is_standard
+        assert puzzle.is_red
 
     def test_init_blank(self) -> None:
         puzzle = Puzzle(1, 1)
@@ -637,6 +650,8 @@ class TestPuzzle:
         assert isinstance(puzzle.get(0, 0), EmptySpot)
         assert str(puzzle) == "(Empty 1x1 Puzzle)"
         assert repr(puzzle) == "Puzzle(1, 1)"
+        assert puzzle.is_standard
+        assert puzzle.is_red
 
     def test_init_piece(self, piece3: Piece) -> None:
         op3 = OrientedPiece(piece3)
@@ -652,6 +667,8 @@ class TestPuzzle:
 └♢┘"""
         )
         assert repr(puzzle) == f"Puzzle(1, 1, (OrientedPiece({piece3!r}),))"
+        assert puzzle.is_standard
+        assert puzzle.is_red
 
     def test_init_missing_piece(
         self, piece3: Piece, piece1: Piece, piece4: Piece
@@ -673,6 +690,8 @@ class TestPuzzle:
 ♢R♣  \n\
 └♧┘  """
         assert str(puzzle) == expected
+        assert puzzle.is_standard
+        assert puzzle.is_red
 
     def test_init_row_pair(self, piece1: Piece, piece3: Piece) -> None:
         op1 = OrientedPiece(piece1)
@@ -688,6 +707,8 @@ class TestPuzzle:
 └♢┴♡┘\
 """
         )
+        assert puzzle.is_standard
+        assert puzzle.is_red
 
     def test_init_fails_negative_width(self) -> None:
         with pytest.raises(ValueError) as err:
